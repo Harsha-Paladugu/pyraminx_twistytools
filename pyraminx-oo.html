@@ -1,0 +1,1363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pyraminx OO — objectively optimal</title>
+<meta name="description" content="A community census of every Pyraminx position: 78,012 scrambles, one best human solution each.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300..800&family=Instrument+Sans:wght@400;500;600&family=Spline+Sans+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpolygon points='16,2 30,28 2,28' fill='%23f2cf3c'/%3E%3Cpolygon points='16,2 23,15 9,15' fill='%233fbf52'/%3E%3Cpolygon points='9,15 16,28 2,28' fill='%23e8473d'/%3E%3Cpolygon points='23,15 30,28 16,28' fill='%233a7fe8'/%3E%3C/svg%3E">
+<style>
+:root{
+  --ink:#0e1420; --ink2:#141c2c; --panel:#19222f; --panel2:#1f2a3a;
+  --line:rgba(174,190,214,.14); --line2:rgba(174,190,214,.26);
+  --txt:#e8edf6; --mut:#9fadc4; --dim:#6c7a92;
+  --green:#3fbf52; --red:#e8473d; --blue:#3a7fe8; --yellow:#f2cf3c;
+  --act:#f2cf3c; --actink:#231c05;
+  --disp:'Bricolage Grotesque',system-ui,sans-serif;
+  --body:'Instrument Sans',system-ui,sans-serif;
+  --mono:'Spline Sans Mono',ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+html{background:var(--ink)}
+body{margin:0;font-family:var(--body);color:var(--txt);background:
+  radial-gradient(1200px 500px at 85% -10%, rgba(58,127,232,.08), transparent 60%),
+  radial-gradient(900px 480px at -10% 8%, rgba(63,191,82,.06), transparent 55%),
+  var(--ink);min-height:100vh;font-size:15.5px;line-height:1.55}
+a{color:var(--txt)}
+code,.mono{font-family:var(--mono)}
+button{font-family:var(--body);font-size:14.5px;cursor:pointer;border:none;border-radius:9px}
+button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--yellow);outline-offset:2px}
+.primary{background:var(--act);color:var(--actink);font-weight:600;padding:.62em 1.1em}
+.primary:hover{filter:brightness(1.07)}
+.primary[disabled]{opacity:.4;cursor:not-allowed}
+.ghost{background:transparent;color:var(--mut);border:1px solid var(--line2);padding:.55em 1em;border-radius:9px;text-decoration:none;display:inline-block}
+.ghost:hover{color:var(--txt);border-color:var(--mut)}
+.ghost.off{opacity:.3;pointer-events:none}
+.ghost.sm{padding:.3em .7em;font-size:13px}
+.ghost.big{font-size:16px;padding:.7em 1.4em}
+.danger{background:transparent;color:var(--red);border:1px solid rgba(232,71,61,.5);padding:.55em 1em}
+.danger:hover{background:rgba(232,71,61,.12)}
+
+/* top bar */
+.topbar{display:flex;align-items:center;gap:26px;padding:14px 26px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.wordmark{font-family:var(--disp);font-weight:700;font-size:19px;letter-spacing:.06em;text-decoration:none;display:flex;align-items:center;gap:9px}
+.wordmark b{color:var(--yellow);font-weight:800}
+.tri{width:17px;height:15px;display:inline-block;background:
+  conic-gradient(from 0deg at 50% 62%, var(--green) 0 90deg, var(--blue) 90deg 180deg, var(--red) 180deg 270deg, var(--yellow) 270deg 360deg);
+  clip-path:polygon(50% 0,100% 100%,0 100%)}
+.navtabs{display:flex;gap:4px;flex:1;flex-wrap:wrap}
+.navlink{text-decoration:none;color:var(--mut);padding:.45em .9em;border-radius:8px;font-weight:500}
+.navlink:hover{color:var(--txt)}
+.navlink.on{color:var(--txt);background:var(--panel2)}
+.authbox{display:flex;align-items:center;gap:12px}
+.whoami{color:var(--mut);font-size:14px}
+.demobadge{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--yellow);border:1px dashed rgba(242,207,60,.5);border-radius:6px;padding:2px 8px}
+
+.page{max-width:1060px;margin:0 auto;padding:30px 24px 80px}
+
+/* hero */
+.hero{display:grid;grid-template-columns:1.15fr 1fr;gap:40px;align-items:center;margin:18px 0 34px}
+.eyebrow{letter-spacing:.14em;text-transform:uppercase;font-size:12.5px;color:var(--mut);margin:0 0 10px}
+.hero h1{font-family:var(--disp);font-weight:750;font-size:clamp(30px,4.4vw,44px);line-height:1.08;margin:0 0 16px;letter-spacing:-.01em}
+.hero h1 em{font-style:normal;color:var(--yellow)}
+.lede{color:var(--mut);margin:0 0 20px;max-width:46ch}
+.lede.sm{font-size:14.5px}
+.statline{display:flex;gap:22px;flex-wrap:wrap;margin-bottom:12px}
+.stat{color:var(--mut);font-size:14px}
+.stat b{color:var(--txt);font-family:var(--disp);font-size:20px;font-weight:700;margin-right:5px}
+.pctstat b{color:var(--yellow)}
+.barwrap{height:10px;border-radius:6px;background:var(--panel2);overflow:hidden;border:1px solid var(--line)}
+.bar{height:100%;border-radius:6px;background:linear-gradient(90deg,var(--green),var(--yellow));min-width:2px;transition:width .8s ease}
+.heroright{display:flex;justify-content:center}
+.mountain{width:100%;max-width:430px;height:auto}
+.mcell{transition:fill .5s ease}
+@media(prefers-reduced-motion:no-preference){.mcell.lit{fill-opacity:0}.mcell.lit.in{fill-opacity:1}.mcell{transition:fill-opacity .45s ease}}
+
+/* search */
+.searchrow{display:flex;gap:10px;margin:0 0 34px}
+.searchin{flex:1;background:var(--panel);border:1px solid var(--line2);border-radius:10px;color:var(--txt);padding:.7em .95em;font-size:14.5px}
+.searchin::placeholder{color:var(--dim)}
+.centerrow{text-align:center;margin-top:30px}
+
+/* cards */
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px 22px}
+.card.error{border-color:rgba(232,71,61,.5);color:var(--red)}
+.card h3{font-family:var(--disp);font-weight:650;margin:0 0 8px;font-size:17px}
+.card p{color:var(--mut);margin:0;font-size:14.5px}
+.trio{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.empty{color:var(--dim);font-style:italic}
+
+/* pair page */
+.crumbs{color:var(--dim);font-size:13.5px;margin-bottom:14px}
+.crumbs a{color:var(--mut)}
+.pairrow{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+.pairrow.single{grid-template-columns:minmax(0,640px);justify-content:center}
+.sidepanel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px}
+.sidehead{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+.sidelabel{font-family:var(--disp);font-weight:650;font-size:15px;letter-spacing:.02em}
+.ordinal{margin-left:auto;color:var(--dim);font-size:13px}
+.depthchip{font-size:12px;border-radius:6px;padding:2px 8px;background:var(--panel2);color:var(--mut);border:1px solid var(--line)}
+.donechip{font-size:12px;border-radius:6px;padding:2px 8px;color:var(--green);border:1px solid rgba(63,191,82,.5)}
+.netwrap{display:flex;justify-content:center;padding:8px 0 12px}
+.oonet polygon{stroke:var(--ink);stroke-width:1.6;stroke-linejoin:round}
+.oonet.thumb polygon{stroke-width:2.4}
+.scrline{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:6px 0}
+.scrlabel{font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);white-space:nowrap}
+.scr{font-size:15px;color:var(--txt);word-break:break-word}
+.copy{background:transparent;border:1px solid var(--line2);color:var(--mut);border-radius:7px;padding:.15em .5em;font-size:14px}
+.copy:hover{color:var(--txt)}
+.symhead{font-size:13px;color:var(--mut);margin:10px 0 6px}
+.hintt{color:var(--dim)}
+.symstrip{display:flex;gap:6px;flex-wrap:wrap}
+.symthumb{background:var(--ink2);border:1px solid var(--line);border-radius:9px;padding:4px;line-height:0}
+.symthumb:hover{border-color:var(--mut)}
+.symthumb.on{border-color:var(--yellow)}
+.symdetail{display:flex;align-items:center;gap:10px;flex-wrap:wrap;min-height:1.6em;margin-top:8px}
+
+/* solutions */
+.solcard{margin-bottom:16px}
+.solrow{display:grid;grid-template-columns:1fr 1fr auto;gap:14px;align-items:center;padding:12px 0;border-top:1px solid var(--line)}
+.solrow:first-of-type{border-top:none}
+.solrow.pending{opacity:.65}
+.solcell{display:flex;flex-direction:column;gap:4px}
+.soltag{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim)}
+.soltag.auto{color:var(--blue)}
+.sol{font-size:15.5px}
+.solmeta{color:var(--mut);font-size:13.5px;white-space:nowrap}
+.solin{width:100%;background:var(--ink2);border:1px solid var(--line2);border-radius:10px;color:var(--txt);padding:.7em .9em;font-size:15.5px;resize:vertical;margin-bottom:8px}
+.verifyline{font-size:13.5px;color:var(--dim);min-height:1.5em;margin-bottom:8px}
+.verifyline.good{color:var(--green)}
+.verifyline.bad{color:var(--red)}
+.namerow{display:flex;align-items:center;gap:8px;color:var(--mut);font-size:14px;margin-bottom:14px}
+
+/* browse */
+.browsehead h2{font-family:var(--disp);font-weight:700;margin:0 0 6px}
+.depthchips{display:flex;gap:7px;flex-wrap:wrap;margin:16px 0 22px}
+.depthsel{display:flex;flex-direction:column;align-items:center;gap:1px;text-decoration:none;border:1px solid var(--line);border-radius:10px;padding:7px 11px;min-width:62px;background:var(--panel)}
+.depthsel b{font-family:var(--disp);font-size:17px}
+.depthsel span{font-size:11px;color:var(--dim)}
+.depthsel:hover{border-color:var(--mut)}
+.depthsel.on{border-color:var(--yellow);background:var(--panel2)}
+.classgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:10px}
+.classcell{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:9px 8px 6px;text-decoration:none;text-align:center}
+.classcell:hover{border-color:var(--mut)}
+.classcell.done{border-color:rgba(63,191,82,.45)}
+.cellmeta{font-size:12px;color:var(--dim);margin-top:3px}
+.tick{color:var(--green)}
+.pager{display:flex;align-items:center;gap:14px;margin-top:20px;flex-wrap:wrap}
+.pginfo{color:var(--dim);font-size:13.5px}
+
+/* mod */
+.modrow{display:grid;grid-template-columns:auto 1fr auto;gap:18px;align-items:center;margin-bottom:12px}
+.modacts{display:flex;flex-direction:column;gap:8px}
+.modlist{margin:10px 0}
+.modent{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 0;border-top:1px solid var(--line);color:var(--mut);font-size:14.5px}
+.modent:first-child{border-top:none}
+.inviterow{display:flex;gap:10px;margin-top:10px}
+
+/* about */
+.prose h2{font-family:var(--disp);font-weight:700;margin-top:0}
+.prose h3{font-family:var(--disp);font-weight:650;margin:22px 0 6px}
+.prose p{color:var(--mut);font-size:15px;max-width:72ch}
+.nottable{display:grid;gap:0;margin:8px 0}
+.nrow{display:grid;grid-template-columns:190px 230px 1fr;gap:14px;padding:9px 0;border-top:1px solid var(--line);font-size:14px;color:var(--mut)}
+.nrow:first-child{border-top:none}
+.nrow b{color:var(--txt);font-weight:600}
+.nrow code{color:var(--yellow)}
+
+/* toast + boot */
+.toast{position:fixed;left:50%;bottom:28px;transform:translate(-50%,16px);background:var(--panel2);border:1px solid var(--line2);color:var(--txt);padding:.7em 1.2em;border-radius:11px;opacity:0;transition:all .3s ease;z-index:50;max-width:90vw}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+#boot-status{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:var(--ink);z-index:40;transition:opacity .4s ease}
+#boot-status.gone{opacity:0;pointer-events:none}
+#boot-status .bigtri{width:74px;height:64px;background:conic-gradient(from 0deg at 50% 62%, var(--green) 0 90deg, var(--blue) 90deg 180deg, var(--red) 180deg 270deg, var(--yellow) 270deg 360deg);clip-path:polygon(50% 0,100% 100%,0 100%);animation:pulse 1.6s ease-in-out infinite}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.07)}}
+@media(prefers-reduced-motion:reduce){#boot-status .bigtri{animation:none}.bar{transition:none}}
+#boot-label{color:var(--mut);font-size:14.5px}
+#boot-hint{color:var(--dim);font-size:12.5px;max-width:40ch;text-align:center}
+#boot-track{width:280px;height:8px;border-radius:5px;background:var(--panel2);overflow:hidden;border:1px solid var(--line)}
+#boot-bar{height:100%;width:0;background:linear-gradient(90deg,var(--green),var(--yellow));transition:width .25s ease}
+
+@media(max-width:860px){
+  .hero{grid-template-columns:1fr}
+  .trio{grid-template-columns:1fr}
+  .pairrow{grid-template-columns:1fr}
+  .solrow{grid-template-columns:1fr;gap:6px}
+  .modrow{grid-template-columns:1fr}
+  .nrow{grid-template-columns:1fr;gap:2px}
+  .topbar{gap:12px}
+}
+</style>
+<script>
+/* ============================ CONFIG ============================
+   Paste your Firebase web-app config below (see SETUP.md).
+   Leave firebase:null to run in demo mode (data stays in this browser). */
+window.OO_CONFIG = {
+     firebase: {
+       apiKey: "BG4VaV5MrZz1k99-E5TKUiXFUeRNXaESB0jFF3Apc0NBUiqW60_mvXsgUWx-5EL2LJ_tZWYygz9n1rXmA8f9ic0",
+       authDomain: "pyraminx-oo.firebaseapp.com",
+       projectId: "pyraminx-oo",
+       appId: "1:337026212730:web:bff3068050a1b03eb8ecc3"
+     },
+     adminEmails: ["harsha.paladugu2@gmail.com"]   // your Google account email
+   };
+</script>
+</head>
+<body>
+<div id="boot-status">
+  <div class="bigtri" aria-hidden="true"></div>
+  <div id="boot-label">Waking up…</div>
+  <div id="boot-track"><div id="boot-bar"></div></div>
+  <div id="boot-hint">First visit computes the full 933,120-position map (~20s). It is cached — next time is instant.</div>
+</div>
+<div id="app"></div>
+<script>
+(function(){const module={exports:{}};
+// Pyraminx OO engine — full no-tips state space (933,120 states), 12 rotations + LR mirror.
+// State: { e:[piece,flip]x6 slots, c:[L,R,B] axial twists, u: U axial twist }
+// Slots: 0=UL 1=UR 2=UB 3=DF 4=DL 5=DR  (face pairs in XO below)
+// Faces: F, Lf, Rf, D.  Corners (move axes): U,L,R,B — corner X is opposite face OPP[X].
+
+const FACES = ['F', 'Lf', 'Rf', 'D'];
+const XO = [['F','Lf'],['F','Rf'],['Lf','Rf'],['F','D'],['Lf','D'],['Rf','D']];
+const OPP = { U:'D', L:'Rf', R:'Lf', B:'F' };           // corner -> opposite face
+const COPP = { D:'U', Rf:'L', Lf:'R', F:'B' };          // face -> opposite corner
+
+// Move tables (validated against the trainer's engine over 1561 sheet algorithms)
+const S4 = {
+  U: { cyc: [[0,2,0],[2,1,1],[1,0,1]], center: -1 },
+  R: { cyc: [[1,5,0],[5,3,1],[3,1,1]], center: 1 },
+  L: { cyc: [[0,3,1],[3,4,1],[4,0,0]], center: 0 },
+  B: { cyc: [[2,4,1],[4,5,1],[5,2,0]], center: 2 },
+};
+// Whole-puzzle rotations about each corner axis: how FACES move (one CW step)
+const G4 = {
+  U: { F:'Lf', Lf:'Rf', Rf:'F', D:'D' },
+  R: { F:'Rf', Rf:'D', D:'F', Lf:'Lf' },
+  L: { F:'D', D:'Lf', Lf:'F', Rf:'Rf' },
+  B: { Lf:'D', D:'Rf', Rf:'Lf', F:'F' },
+};
+
+function solved() { return { e: [0,0,1,0,2,0,3,0,4,0,5,0], c: [0,0,0], u: 0 }; }
+function copy(s) { return { e: s.e.slice(), c: s.c.slice(), u: s.u }; }
+function eq(a, b) { return a.u === b.u && a.e.join() === b.e.join() && a.c.join() === b.c.join(); }
+
+// prime=false: one CW turn.  U also twists the U axial center (tracked in .u).
+function move(s, f, prime) {
+  const n = prime ? 2 : 1;
+  for (let k = 0; k < n; k++) {
+    const r = s.e.slice();
+    for (const [i, o, fl] of S4[f].cyc) { s.e[o*2] = r[i*2]; s.e[o*2+1] = r[i*2+1] ^ fl; }
+    if (S4[f].center >= 0) s.c[S4[f].center] = (s.c[S4[f].center] + 1) % 3;
+    else s.u = (s.u + 1) % 3;
+  }
+  return s;
+}
+const MOVES = ['U',"U'",'L',"L'",'R',"R'",'B',"B'"];
+function applyMoveIdx(s, m) { return move(s, MOVES[m][0], MOVES[m].length > 1); }
+
+// ---------------- indexing ----------------
+// index = ((permRank720 * 64 + flipBits) * 27 + c) * 3 + u   — 3,732,480 slots, 933,120 reachable
+const FACT = [1,1,2,6,24,120,720];
+function permRank(p) {
+  let r = 0; const a = p.slice();
+  for (let i = 0; i < 6; i++) {
+    let m = 0; for (let j = i+1; j < 6; j++) if (a[j] < a[i]) m++;
+    r += m * FACT[5 - i];
+  }
+  return r;
+}
+function permUnrank(r) {
+  const avail = [0,1,2,3,4,5], p = [];
+  for (let i = 5; i >= 0; i--) { const d = Math.floor(r / FACT[i]); r %= FACT[i]; p.push(avail.splice(d,1)[0]); }
+  return p;
+}
+function idx(s) {
+  const p = [s.e[0],s.e[2],s.e[4],s.e[6],s.e[8],s.e[10]];
+  let fb = 0; for (let i = 0; i < 6; i++) fb |= s.e[i*2+1] << i;
+  const c = s.c[0]*9 + s.c[1]*3 + s.c[2];
+  return ((permRank(p)*64 + fb)*27 + c)*3 + s.u;
+}
+function unidx(ix) {
+  const u = ix % 3; ix = (ix - u) / 3;
+  const c = ix % 27; ix = (ix - c) / 27;
+  const fb = ix % 64; const pr = (ix - fb) / 64;
+  const p = permUnrank(pr), e = new Array(12);
+  for (let i = 0; i < 6; i++) { e[i*2] = p[i]; e[i*2+1] = (fb >> i) & 1; }
+  return { e, c: [Math.floor(c/9), Math.floor(c/3)%3, c%3], u };
+}
+const NSLOTS = 720*64*27*3;
+
+// ---------------- symmetries ----------------
+// A face permutation sigma induces: slot map, flip-toggle per slot, corner map.
+// flip rule: new flip = old flip ^ rev[slot] ^ rev[pieceHomeSlot]  (validated below by
+// the homomorphism test sigma(m·s) == sigma(m)·sigma(s) over all generators).
+function faceCompose(a, b) { const r = {}; for (const f of FACES) r[f] = a[b[f]]; return r; }
+const FACE_ID = { F:'F', Lf:'Lf', Rf:'Rf', D:'D' };
+
+function slotOf(a, b) {
+  for (let i = 0; i < 6; i++) {
+    if (XO[i][0] === a && XO[i][1] === b) return [i, 0];
+    if (XO[i][0] === b && XO[i][1] === a) return [i, 1];
+  }
+  throw new Error('bad pair ' + a + ',' + b);
+}
+function symFromFacePerm(fp, mirror) {
+  const slot = new Array(6), rev = new Array(6);
+  for (let i = 0; i < 6; i++) {
+    const [a, b] = XO[i];
+    const [j, r] = slotOf(fp[a], fp[b]);
+    slot[i] = j; rev[i] = r;
+  }
+  // corner map via face opposition: corner X -> COPP[ fp[ OPP[X] ] ]
+  const corner = {};
+  for (const x of ['U','L','R','B']) corner[x] = COPP[fp[OPP[x]]];
+  return { fp, slot, rev, corner, mirror: !!mirror };
+}
+function applySym(sym, s) {
+  const o = { e: new Array(12), c: [0,0,0], u: 0 };
+  for (let i = 0; i < 6; i++) {
+    const pc = s.e[i*2], fl = s.e[i*2+1];
+    o.e[sym.slot[i]*2] = sym.slot[pc];
+    o.e[sym.slot[i]*2+1] = fl ^ sym.rev[i] ^ sym.rev[pc];
+  }
+  const tw = { L: s.c[0], R: s.c[1], B: s.c[2], U: s.u };
+  const out = {};
+  for (const x of ['U','L','R','B']) {
+    let t = tw[x];
+    if (sym.mirror) t = (3 - t) % 3;
+    out[sym.corner[x]] = t;
+  }
+  o.c = [out.L, out.R, out.B]; o.u = out.U;
+  return o;
+}
+// move letter mapping under a symmetry: physical axis follows the corner map;
+// a mirror also inverts the turn direction.
+function symMoveIdx(sym, m) {
+  const f = MOVES[m][0], pr = MOVES[m].length > 1;
+  const nf = sym.corner[f];
+  const npr = sym.mirror ? !pr : pr;
+  return MOVES.indexOf(nf + (npr ? "'" : ''));
+}
+
+// generate the 12 rotations (A4 on faces) + the LR mirror
+function buildSyms() {
+  const seen = new Map(); const queue = [FACE_ID];
+  seen.set(JSON.stringify(FACE_ID), FACE_ID);
+  while (queue.length) {
+    const fp = queue.pop();
+    for (const g of ['U','R','L','B']) {
+      const nf = faceCompose(G4[g], fp);
+      const k = JSON.stringify(nf);
+      if (!seen.has(k)) { seen.set(k, nf); queue.push(nf); }
+    }
+  }
+  const rots = [...seen.values()].map(fp => symFromFacePerm(fp, false));
+  if (rots.length !== 12) throw new Error('expected 12 rotations, got ' + rots.length);
+  const mirrorFp = { F:'F', Lf:'Rf', Rf:'Lf', D:'D' };
+  const mirrors = rots.map(r => symFromFacePerm(faceCompose(r.fp, mirrorFp), true));
+  return { rots, mirrors, all: rots.concat(mirrors) };
+}
+
+// ---------------- canonicalization ----------------
+function makeCanon(syms) {
+  return function canon(s) {
+    let best = Infinity;
+    for (const sym of syms.rots) { const v = idx(applySym(sym, s)); if (v < best) best = v; }
+    return best;
+  };
+}
+function makeMirrorCanon(syms) {
+  return function mcanon(s) {
+    let best = Infinity;
+    for (const sym of syms.mirrors) { const v = idx(applySym(sym, s)); if (v < best) best = v; }
+    return best;
+  };
+}
+
+// ---------------- BFS distance table ----------------
+function bfs(progress) {
+  const dist = new Int8Array(NSLOTS).fill(-1);
+  let frontier = [solved()];
+  dist[idx(solved())] = 0;
+  let d = 0, total = 1;
+  while (frontier.length) {
+    const next = [];
+    for (const s of frontier) for (let m = 0; m < 8; m++) {
+      const t = copy(s); applyMoveIdx(t, m);
+      const i = idx(t);
+      if (dist[i] === -1) { dist[i] = d + 1; next.push(t); }
+    }
+    d++; total += next.length;
+    if (progress) progress(d, next.length, total);
+    frontier = next;
+  }
+  return dist;
+}
+
+// ---------------- solution / scramble parsing ----------------
+// Tokens: U L R B (+' or 2), wides Uw Lw Rw Bw (1 move), rotations [u] [l] [r] [b] / y (0 moves),
+// lowercase u l r b = tips -> dropped. X2 == X'. Wides follow the sheet convention:
+// Rw = L [l'],  Lw = R [r'],  Uw = B [b'],  Bw = U [u'].
+const WIDE = { R: ['L','L'], L: ['R','R'], U: ['B','B'], B: ['U','U'] }; // [moveLetter, rotAxis] with inverse rotation
+function parseAlg(str) {
+  const out = []; // {kind:'move'|'rot', f, amt(1|2), wide}
+  const toks = String(str).replace(/[()，,]/g, ' ').trim().split(/\s+/).filter(Boolean);
+  for (let t of toks) {
+    if (!t) continue;
+    let m;
+    if ((m = t.match(/^\[([ulrb])(2|')?\]$/))) { // rotation [u] [l'] [r2]...
+      out.push({ kind: 'rot', f: m[1].toUpperCase(), amt: m[2] === '2' || m[2] === "'" ? 2 : 1 });
+      continue;
+    }
+    if ((m = t.match(/^(y)(2|')?$/))) { out.push({ kind: 'rot', f: 'U', amt: m[2] ? 2 : 1 }); continue; }
+    if ((m = t.match(/^([ULRB])w(2|')?$/))) {
+      out.push({ kind: 'move', f: m[1], amt: m[2] ? 2 : 1, wide: true });
+      continue;
+    }
+    if ((m = t.match(/^([ULRB])(2|')?$/))) {
+      out.push({ kind: 'move', f: m[1], amt: m[2] ? 2 : 1, wide: false });
+      continue;
+    }
+    if (/^[ulrb](2|')?$/.test(t)) continue; // tip move -> dropped
+    return null; // unparseable token
+  }
+  return out;
+}
+function countMoves(parsed) { let n = 0; for (const t of parsed) if (t.kind === 'move') n++; return n; }
+
+// Apply parsed tokens to a state, tracking the rotation frame.
+// frame: face-perm mapping written letters to physical axes via corner map.
+function makeFrames(syms) {
+  // rotation about corner X (CW one step) as a sym object, for frame composition
+  const rotByCorner = {};
+  for (const x of ['U','L','R','B']) rotByCorner[x] = symFromFacePerm(G4[x], false);
+  return rotByCorner;
+}
+function applyParsed(parsed, state, syms, rotByCorner) {
+  let s = copy(state);
+  // frame = sym whose corner map sends WRITTEN letters to PHYSICAL axes; starts identity
+  let frame = symFromFacePerm(FACE_ID, false);
+  for (const t of parsed) {
+    if (t.kind === 'rot') {
+      // rotating the puzzle about written axis t.f; physical axis = frame.corner[f]
+      const phys = frame.corner[t.f];
+      for (let k = 0; k < t.amt; k++) frame = composeSym(rotByCorner[phys], frame);
+      continue;
+    }
+    let f = t.f, amt = t.amt, extraRot = null;
+    if (t.wide) { const [mv, axis] = WIDE[t.f]; f = mv; extraRot = axis; }
+    const phys = frame.corner[f];
+    for (let k = 0; k < amt; k++) move(s, phys, false);
+    if (extraRot) {
+      const physAxis = frame.corner[extraRot];
+      // inverse rotation = two CW steps
+      const steps = amt === 1 ? 2 : 1; // [x'] for Xw, [x] for Xw' (inverse of inverse)
+      for (let k = 0; k < steps; k++) frame = composeSym(rotByCorner[physAxis], frame);
+    }
+  }
+  return s;
+}
+function composeSym(a, b) { // apply b then a
+  const fp = faceCompose(a.fp, b.fp);
+  return symFromFacePerm(fp, a.mirror !== b.mirror);
+}
+
+// mirror a solution string token-by-token (LR mirror): R<->L, U->U', B->B', primes flip; rotations/wides likewise
+function mirrorToken(t) {
+  const map = { U:'U', B:'B', R:'L', L:'R', u:'u', b:'b', r:'l', l:'r' };
+  let m;
+  if ((m = t.match(/^\[([ulrb])(2|')?\]$/))) {
+    const f = map[m[1]]; const p = m[2] ? '' : "'";
+    return '[' + f + p + ']';
+  }
+  if ((m = t.match(/^(y)(2|')?$/))) return m[2] ? 'y' : "y'";
+  if ((m = t.match(/^([ULRB])(w?)(2|')?$/))) {
+    const f = map[m[1]]; const w = m[2]; const p = m[3] ? '' : "'";
+    return f + w + p;
+  }
+  if ((m = t.match(/^([ulrb])(2|')?$/))) { const f = map[m[1]]; const p = m[2] ? '' : "'"; return f + p; }
+  return t;
+}
+function mirrorAlg(str) {
+  return String(str).trim().split(/\s+/).filter(Boolean).map(mirrorToken).join(' ');
+}
+
+// optimal solution from a state via the distance table (random tie-breaks if rand)
+function optimalSolution(state, dist, rand) {
+  const s = copy(state); const out = [];
+  let d = dist[idx(s)];
+  if (d < 0) return null;
+  while (d > 0) {
+    const opts = [];
+    for (let m = 0; m < 8; m++) {
+      const t = copy(s); applyMoveIdx(t, m);
+      if (dist[idx(t)] === d - 1) opts.push(m);
+    }
+    const m = rand ? opts[Math.floor(Math.random()*opts.length)] : opts[0];
+    applyMoveIdx(s, m); out.push(MOVES[m]); d--;
+  }
+  return out.join(' ');
+}
+function invertAlg(str) {
+  return str.split(/\s+/).filter(Boolean).reverse()
+    .map(t => t.endsWith("'") ? t.slice(0, -1) : t + "'").join(' ');
+}
+// optimal scramble TO a state = inverse of an optimal solution of that state
+function optimalScramble(state, dist, rand) {
+  const sol = optimalSolution(state, dist, rand);
+  return sol === null ? null : (sol === '' ? '' : invertAlg(sol));
+}
+function applyScramble(str, base) {
+  const s = base ? copy(base) : solved();
+  const parsed = parseAlg(str);
+  if (!parsed) return null;
+  for (const t of parsed) {
+    if (t.kind === 'rot' || t.wide) return null; // scrambles: plain moves only
+    for (let k = 0; k < t.amt; k++) move(s, t.f, false);
+  }
+  return s;
+}
+
+module.exports = {
+  FACES, XO, S4, G4, OPP, COPP, MOVES, NSLOTS,
+  solved, copy, eq, move, applyMoveIdx, idx, unidx,
+  buildSyms, symFromFacePerm, applySym, symMoveIdx, composeSym, makeCanon, makeMirrorCanon,
+  bfs, parseAlg, countMoves, applyParsed, makeFrames, mirrorAlg, mirrorToken,
+  optimalSolution, optimalScramble, invertAlg, applyScramble, faceCompose, FACE_ID,
+};
+
+window.OOEngine=module.exports;})();
+</script>
+<script>
+(function(){
+// Pyraminx OO — full 4-face net renderer.
+// Net: big upright triangle. Top = F (upright), center = D (inverted),
+// bottom-left = Lf, bottom-right = Rf. Corner vertices labeled with puzzle corners
+// so every shared vertex is consistent. Tips are rendered in face color (untracked).
+const E = typeof require !== 'undefined' ? require('./engine.js') : window.OOEngine;
+
+const COLORS = { F: '#3fbf52', Lf: '#e8473d', Rf: '#3a7fe8', D: '#f2cf3c' };
+
+// big triangle in a 200x174 box: apex (100,4), base (10,160)-(190,160); midpoints
+const PT = { apex: [100, 7], bl: [10, 163], br: [190, 163], ml: [55, 85], mr: [145, 85], mb: [100, 163] };
+// faces: vertices in order [v0,v1,v2] with the CORNER name at each vertex
+const NET = [
+  { face: 'F',  pts: [PT.apex, PT.ml, PT.mr], corners: ['U', 'L', 'R'] },
+  { face: 'D',  pts: [PT.mb, PT.mr, PT.ml],  corners: ['B', 'R', 'L'] },
+  { face: 'Lf', pts: [PT.bl, PT.mb, PT.ml],  corners: ['U', 'B', 'L'] },
+  { face: 'Rf', pts: [PT.br, PT.mr, PT.mb],  corners: ['U', 'R', 'B'] },
+];
+
+const lerp = (a, b, t) => [a[0] + (b[0]-a[0])*t, a[1] + (b[1]-a[1])*t];
+
+// subdivide a face triangle into 9 stickers; classify each as tip / axial / edge
+function faceStickers(def) {
+  const [A, B, C] = def.pts, [cA, cB, cC] = def.corners;
+  const P = (i, j) => { // barycentric grid point: i steps toward B, j toward C (i+j<=3)
+    const t = (i + j) === 0 ? A : lerp(lerp(A, B, (i+j)/3), lerp(A, C, (i+j)/3), (i+j) === 0 ? 0 : j/(i+j));
+    return t;
+  };
+  const grid = [];
+  for (let r = 0; r <= 3; r++) { grid[r] = []; for (let k = 0; k <= r; k++) grid[r][k] = P(r-k, k); }
+  const out = [];
+  for (let r = 0; r < 3; r++) {
+    for (let k = 0; k <= r; k++) {
+      out.push({ pts: [grid[r][k], grid[r+1][k], grid[r+1][k+1]], up: true, r, k });
+      if (k < r) out.push({ pts: [grid[r][k], grid[r][k+1], grid[r+1][k+1]], up: false, r, k });
+    }
+  }
+  // classify: tips at the 3 corners; axial = inverted triangle adjacent to each tip;
+  // edge stickers = the remaining 3 upright triangles, each on the middle of a side.
+  for (const s of out) {
+    const { r, k, up } = s;
+    if (up && r === 0)            { s.kind = 'tip';  s.ref = cA; }
+    else if (up && r === 2 && k === 0) { s.kind = 'tip';  s.ref = cB; }
+    else if (up && r === 2 && k === 2) { s.kind = 'tip';  s.ref = cC; }
+    else if (!up && r === 1)       { s.kind = 'axial'; s.ref = cA; }           // below A's tip
+    else if (!up && r === 2 && k === 0) { s.kind = 'axial'; s.ref = cB; }
+    else if (!up && r === 2 && k === 1) { s.kind = 'axial'; s.ref = cC; }
+    else if (up && r === 1 && k === 0) { s.kind = 'edge'; s.pair = [cA, cB]; } // side A-B middle
+    else if (up && r === 1 && k === 1) { s.kind = 'edge'; s.pair = [cA, cC]; }
+    else if (up && r === 2 && k === 1) { s.kind = 'edge'; s.pair = [cB, cC]; }
+    s.face = def.face;
+  }
+  return out;
+}
+const ALL_STICKERS = NET.flatMap(faceStickers);
+
+// edge slot for a face given the two corner names of that side:
+// the side lies between this face and the face NOT touching either... the edge piece
+// between faces f and g sits on the side whose corners are the two corners shared by f and g.
+// Corners touching face f = all corners except COPP[f]. For side corners {a,b} on face f,
+// the adjacent face g is the one whose corner set also contains a and b: g != f and COPP[g] not in {a,b}... 
+// directly: g is the face opposite the third corner of f (the corner of f not on this side).
+function edgeSlotFor(face, pairCorners) {
+  const cs = ['U','L','R','B'].filter(x => E.OPP[x] !== face); // corners of this face
+  const third = cs.find(x => !pairCorners.includes(x));
+  const g = E.OPP[third];
+  for (let i = 0; i < 6; i++) {
+    const [a, b] = E.XO[i];
+    if ((a === face && b === g) || (a === g && b === face)) return [i, a === face ? 0 : 1];
+  }
+  throw new Error('no slot for ' + face + '/' + g);
+}
+// precompute sticker resolution metadata
+for (const s of ALL_STICKERS) {
+  if (s.kind === 'edge') { const [slot, side] = edgeSlotFor(s.face, s.pair); s.slot = slot; s.side = side; }
+}
+
+// axial sticker color: piece at corner X twisted t steps CW; sticker now on face f
+// came from face (G4[X])^{-t}(f)
+function axialColor(state, corner, face) {
+  const tw = corner === 'U' ? state.u : state.c[{ L:0, R:1, B:2 }[corner]];
+  let f = face;
+  for (let k = 0; k < tw; k++) { // apply inverse rotation t times: find preimage under G4[corner]
+    f = Object.keys(E.G4[corner]).find(x => E.G4[corner][x] === f);
+  }
+  return f;
+}
+function stickerColor(state, s) {
+  if (s.kind === 'tip') return s.face;
+  if (s.kind === 'axial') return axialColor(state, s.ref, s.face);
+  const piece = state.e[s.slot*2], fl = state.e[s.slot*2+1];
+  return E.XO[piece][s.side ^ fl];
+}
+
+function netSVG(state, size, opts) {
+  const o = opts || {};
+  const cells = ALL_STICKERS.map(s => {
+    const col = COLORS[stickerColor(state, s)];
+    const dim = s.kind === 'tip' ? .82 : 1;
+    const fill = dim === 1 ? col : shade(col, dim);
+    return `<polygon points="${s.pts.map(p => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ')}" fill="${fill}"/>`;
+  }).join('');
+  return `<svg viewBox="0 0 200 170" width="${size}" height="${size*0.85}" class="${o.cls||'oonet'}" role="img" aria-label="pyraminx state">${cells}</svg>`;
+}
+function shade(hex, f) {
+  const v = parseInt(hex.slice(1), 16);
+  const ch = sh => Math.round(((v >> sh) & 255) * f).toString(16).padStart(2, '0');
+  return '#' + ch(16) + ch(8) + ch(0);
+}
+
+if (typeof module !== 'undefined') module.exports = { netSVG, stickerColor, ALL_STICKERS, COLORS, axialColor };
+else window.OORender = { netSVG, stickerColor, ALL_STICKERS, COLORS, axialColor };
+
+})();
+</script>
+<script>
+/* Pyraminx OO — app layer. Expects window.OOEngine (engine) + window.OORender (net renderer). */
+(function () {
+const E = window.OOEngine, R = window.OORender;
+const CFG = window.OO_CONFIG || {};
+const $ = (sel, el) => (el || document).querySelector(sel);
+const h = (tag, attrs, ...kids) => {
+  const el = document.createElement(tag);
+  for (const k in (attrs || {})) {
+    if (k === 'class') el.className = attrs[k];
+    else if (k === 'html') el.innerHTML = attrs[k];
+    else if (k.startsWith('on')) el.addEventListener(k.slice(2), attrs[k]);
+    else if (attrs[k] !== null && attrs[k] !== undefined) el.setAttribute(k, attrs[k]);
+  }
+  for (const kid of kids.flat()) if (kid !== null && kid !== undefined && kid !== false)
+    el.appendChild(typeof kid === 'string' ? document.createTextNode(kid) : kid);
+  return el;
+};
+const fmt = n => n.toLocaleString('en-US');
+
+/* ---------------- tables: BFS + canonical classes, cached in IndexedDB ---------------- */
+const T = { dist: null, reps: null, depths: null, depthIdx: null, syms: null, rotByCorner: null, ready: false };
+const TABLE_VERSION = 'oo-tables-v1';
+
+async function idbGet() {
+  if (!('indexedDB' in window)) return null;
+  try {
+    const db = await new Promise((res, rej) => { const r = indexedDB.open('pyraminx-oo', 1);
+      r.onupgradeneeded = () => r.result.createObjectStore('t');
+      r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+    const v = await new Promise((res, rej) => { const tx = db.transaction('t').objectStore('t').get(TABLE_VERSION);
+      tx.onsuccess = () => res(tx.result); tx.onerror = () => rej(tx.error); });
+    db.close();
+    return v || null;
+  } catch (e) { return null; }
+}
+async function idbPut(payload) {
+  if (!('indexedDB' in window)) return;
+  try {
+    const db = await new Promise((res, rej) => { const r = indexedDB.open('pyraminx-oo', 1);
+      r.onupgradeneeded = () => r.result.createObjectStore('t');
+      r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+    await new Promise((res, rej) => { const tx = db.transaction('t', 'readwrite');
+      tx.objectStore('t').put(payload, TABLE_VERSION);
+      tx.oncomplete = res; tx.onerror = () => rej(tx.error); });
+    db.close();
+  } catch (e) { /* cache is best-effort */ }
+}
+const tick = () => new Promise(r => setTimeout(r, 0));
+
+async function buildTables(report) {
+  T.syms = E.buildSyms();
+  T.rotByCorner = E.makeFrames(T.syms);
+  const cached = await idbGet();
+  if (cached && cached.dist && cached.reps && cached.depths) {
+    T.dist = new Int8Array(cached.dist);
+    T.reps = new Uint32Array(cached.reps);
+    T.depths = new Uint8Array(cached.depths);
+    report('cache', 1, 1);
+  } else {
+    // BFS over the full 933,120-state space
+    const dist = new Int8Array(E.NSLOTS).fill(-1);
+    let frontier = new Uint32Array([E.idx(E.solved())]);
+    dist[frontier[0]] = 0;
+    let d = 0, seen = 1;
+    while (frontier.length) {
+      const next = [];
+      for (let fi = 0; fi < frontier.length; fi++) {
+        const s = E.unidx(frontier[fi]);
+        for (let m = 0; m < 8; m++) {
+          const t2 = E.copy(s); E.applyMoveIdx(t2, m);
+          const ix = E.idx(t2);
+          if (dist[ix] === -1) { dist[ix] = d + 1; next.push(ix); }
+        }
+        if ((fi & 8191) === 8191) { report('bfs', seen + next.length, 933120); await tick(); }
+      }
+      d++; seen += next.length;
+      frontier = Uint32Array.from(next);
+      report('bfs', seen, 933120); await tick();
+    }
+    T.dist = dist;
+    // canonical class enumeration
+    const reps = [], depths = [];
+    const canon = E.makeCanon(T.syms);
+    for (let i = 0; i < E.NSLOTS; i++) {
+      if (dist[i] < 0) continue;
+      const s = E.unidx(i);
+      if (canon(s) === i) { reps.push(i); depths.push(dist[i]); }
+      if ((i & 65535) === 65535) { report('classes', i, E.NSLOTS); await tick(); }
+    }
+    T.reps = Uint32Array.from(reps);
+    T.depths = Uint8Array.from(depths);
+    report('classes', E.NSLOTS, E.NSLOTS);
+    idbPut({ dist: T.dist.buffer, reps: T.reps.buffer, depths: T.depths.buffer });
+  }
+  T.depthIdx = Array.from({ length: 12 }, () => []);
+  for (let o = 0; o < T.reps.length; o++) T.depthIdx[T.depths[o]].push(o);
+  T.ready = true;
+}
+function ordinalOf(classId) { // binary search in reps
+  let lo = 0, hi = T.reps.length - 1;
+  while (lo <= hi) { const mid = (lo + hi) >> 1;
+    if (T.reps[mid] === classId) return mid;
+    if (T.reps[mid] < classId) lo = mid + 1; else hi = mid - 1; }
+  return -1;
+}
+const canonOf = s => E.makeCanon(T.syms)(s);
+const mirrorOf = s => E.makeMirrorCanon(T.syms)(s);
+function variantsOf(classId) { // unique rotation variants of a class, each with its sym
+  const s = E.unidx(classId), seen = new Set(), out = [];
+  for (const sym of T.syms.rots) {
+    const v = E.applySym(sym, s), ix = E.idx(v);
+    if (!seen.has(ix)) { seen.add(ix); out.push({ ix, state: v }); }
+  }
+  return out;
+}
+
+/* ---------------- solution verification ---------------- */
+// Returns {ok, side:'a'|'b', moves, error?} — accepts a solution for any rotation
+// variant of either side of the pair.
+function verifySolution(text, pair) {
+  const parsed = E.parseAlg(text);
+  if (!parsed) return { ok: false, error: 'Unrecognized token. Allowed: U L R B (w, \u2032, 2), rotations [u] [l] [r] [b] or y, tips are ignored.' };
+  const moves = E.countMoves(parsed);
+  if (moves === 0) return { ok: false, error: 'Add some moves first.' };
+  if (moves > 15) return { ok: false, error: moves + ' moves \u2014 submissions must be 15 or fewer.' };
+  for (const side of ['a', 'b']) {
+    if (!pair[side]) continue;
+    for (const v of pair[side].variants) {
+      const end = E.applyParsed(parsed, v.state, T.syms, T.rotByCorner);
+      if (E.eq(end, E.solved())) return { ok: true, side, moves };
+    }
+  }
+  return { ok: false, moves, error: 'Does not solve this scramble (checked every rotation of both mirrors).' };
+}
+function pairOf(classId) {
+  const a = { id: classId, state: E.unidx(classId) };
+  const mid = mirrorOf(a.state);
+  const pairId = Math.min(classId, mid);
+  const lowState = E.unidx(pairId);
+  const hiId = Math.max(classId, mid);
+  const pair = {
+    pairId,
+    a: { id: pairId, state: lowState, ord: ordinalOf(pairId), depth: T.dist[pairId],
+         scramble: E.optimalScramble(lowState, T.dist, false), variants: variantsOf(pairId) },
+    b: null, self: pairId === hiId,
+  };
+  if (!pair.self) {
+    const hiState = E.unidx(hiId);
+    pair.b = { id: hiId, state: hiState, ord: ordinalOf(hiId), depth: T.dist[hiId],
+               scramble: E.optimalScramble(hiState, T.dist, false), variants: variantsOf(hiId) };
+  }
+  return pair;
+}
+
+/* ---------------- data layer ---------------- */
+let DB = null;
+
+function demoDB() {
+  const KEY = 'pyraminx-oo-demo';
+  const load = () => { try { return JSON.parse(localStorage.getItem(KEY)) || { solutions: [], mods: [] }; } catch { return { solutions: [], mods: [] }; } };
+  const save = d => { try { localStorage.setItem(KEY, JSON.stringify(d)); } catch {} };
+  let user = null; const subs = new Set();
+  const notify = () => subs.forEach(f => f());
+  return {
+    mode: 'demo',
+    get user() { return user; },
+    get isMod() { return !!user; },           // demo: every signed-in user moderates, to try the flow
+    get isAdmin() { return !!user; },
+    async init() {},
+    onChange(f) { subs.add(f); },
+    async signIn() { user = { uid: 'demo', name: 'Demo solver', email: 'demo@example.com' }; notify(); },
+    async signOut() { user = null; notify(); },
+    async stats() {
+      const d = load(); const done = new Set();
+      for (const s of d.solutions) if (s.status === 'approved') { done.add(s.classId); if (s.partnerId !== s.classId) done.add(s.partnerId); }
+      return { done: done.size, total: T.reps.length };
+    },
+    async doneMap() {
+      const d = load(); const bm = new Uint8Array(Math.ceil(T.reps.length / 8));
+      for (const s of d.solutions) if (s.status === 'approved')
+        for (const cid of [s.classId, s.partnerId]) { const o = ordinalOf(cid); if (o >= 0) bm[o >> 3] |= 1 << (o & 7); }
+      return bm;
+    },
+    async pairSolutions(pairId) {
+      const d = load();
+      return d.solutions.filter(s => s.pairId === pairId && (s.status === 'approved' || (user && s.uid === user.uid)));
+    },
+    async submit(doc) {
+      const d = load();
+      d.solutions.push({ ...doc, id: 'demo-' + Date.now() + '-' + Math.floor(Math.random()*1e6),
+        uid: user.uid, status: 'pending', createdAt: Date.now() });
+      save(d); notify();
+    },
+    async pending() { const d = load(); return d.solutions.filter(s => s.status === 'pending'); },
+    async review(id, action) {
+      const d = load(); const s = d.solutions.find(x => x.id === id);
+      if (s) { s.status = action; s.reviewedBy = user && user.email; }
+      save(d); notify();
+    },
+    async mods() { return load().mods; },
+    async invite(email) { const d = load(); d.mods.push({ email, addedBy: user.email }); save(d); notify(); },
+    async revoke(email) { const d = load(); d.mods = d.mods.filter(m => m.email !== email); save(d); notify(); },
+  };
+}
+
+function liveDB(cfg) {
+  let app, auth, fs, F, A;
+  let user = null, isMod = false, isAdmin = false;
+  const subs = new Set(); const notify = () => subs.forEach(f => f());
+  const adminEmails = (CFG.adminEmails || []).map(e => e.toLowerCase());
+  return {
+    mode: 'live',
+    get user() { return user; }, get isMod() { return isMod; }, get isAdmin() { return isAdmin; },
+    onChange(f) { subs.add(f); },
+    async init() {
+      const base = 'https://www.gstatic.com/firebasejs/10.12.2/';
+      const [appM, authM, fsM] = await Promise.all([
+        import(base + 'firebase-app.js'), import(base + 'firebase-auth.js'), import(base + 'firebase-firestore.js')]);
+      A = authM; F = fsM;
+      app = appM.initializeApp(cfg);
+      auth = A.getAuth(app); fs = F.getFirestore(app);
+      A.onAuthStateChanged(auth, async u => {
+        user = u ? { uid: u.uid, name: u.displayName, email: (u.email || '').toLowerCase() } : null;
+        isAdmin = !!user && adminEmails.includes(user.email);
+        isMod = isAdmin;
+        if (user && !isMod) {
+          try { const m = await F.getDoc(F.doc(fs, 'moderators', user.uid)); isMod = m.exists(); } catch {}
+          if (!isMod) { // accept an invite if one exists for this email
+            try {
+              const inv = await F.getDoc(F.doc(fs, 'moderatorInvites', user.email));
+              if (inv.exists()) {
+                await F.setDoc(F.doc(fs, 'moderators', user.uid), { email: user.email, via: 'invite' });
+                isMod = true;
+              }
+            } catch {}
+          }
+        }
+        notify();
+      });
+    },
+    async signIn() { await A.signInWithPopup(auth, new A.GoogleAuthProvider()); },
+    async signOut() { await A.signOut(auth); },
+    async stats() {
+      try { const d = await F.getDoc(F.doc(fs, 'meta', 'stats'));
+        return d.exists() ? d.data() : { done: 0, total: T.reps.length };
+      } catch { return { done: 0, total: T.reps.length }; }
+    },
+    async doneMap() {
+      try {
+        const d = await F.getDoc(F.doc(fs, 'meta', 'doneMap'));
+        if (!d.exists()) return new Uint8Array(Math.ceil(T.reps.length / 8));
+        const b64 = d.data().b64 || '';
+        const bin = atob(b64); const bm = new Uint8Array(Math.ceil(T.reps.length / 8));
+        for (let i = 0; i < bin.length && i < bm.length; i++) bm[i] = bin.charCodeAt(i);
+        return bm;
+      } catch { return new Uint8Array(Math.ceil(T.reps.length / 8)); }
+    },
+    async pairSolutions(pairId) {
+      const out = [];
+      const q1 = F.query(F.collection(fs, 'solutions'),
+        F.where('pairId', '==', pairId), F.where('status', '==', 'approved'));
+      (await F.getDocs(q1)).forEach(d => out.push({ id: d.id, ...d.data() }));
+      if (user) {
+        const q2 = F.query(F.collection(fs, 'solutions'),
+          F.where('pairId', '==', pairId), F.where('uid', '==', user.uid), F.where('status', '==', 'pending'));
+        (await F.getDocs(q2)).forEach(d => out.push({ id: d.id, ...d.data() }));
+      }
+      return out;
+    },
+    async submit(doc) {
+      await F.addDoc(F.collection(fs, 'solutions'), {
+        ...doc, uid: user.uid, status: 'pending', createdAt: F.serverTimestamp() });
+      notify();
+    },
+    async pending() {
+      const q = F.query(F.collection(fs, 'solutions'), F.where('status', '==', 'pending'));
+      const out = []; (await F.getDocs(q)).forEach(d => out.push({ id: d.id, ...d.data() }));
+      return out;
+    },
+    async review(id, action) {
+      if (action === 'rejected') {
+        await F.updateDoc(F.doc(fs, 'solutions', id), { status: 'rejected', reviewedBy: user.email });
+        notify(); return;
+      }
+      // approval: transaction updates the solution, the done bitmap and the counter
+      await F.runTransaction(fs, async tx => {
+        const solRef = F.doc(fs, 'solutions', id);
+        const sol = await tx.get(solRef);
+        if (!sol.exists() || sol.data().status !== 'pending') return;
+        const data = sol.data();
+        const mapRef = F.doc(fs, 'meta', 'doneMap'), statRef = F.doc(fs, 'meta', 'stats');
+        const mapDoc = await tx.get(mapRef), statDoc = await tx.get(statRef);
+        const bm = new Uint8Array(Math.ceil(T.reps.length / 8));
+        if (mapDoc.exists() && mapDoc.data().b64) {
+          const bin = atob(mapDoc.data().b64);
+          for (let i = 0; i < bin.length && i < bm.length; i++) bm[i] = bin.charCodeAt(i);
+        }
+        let added = 0;
+        for (const cid of [data.classId, data.partnerId]) {
+          const o = ordinalOf(cid);
+          if (o >= 0 && !(bm[o >> 3] & (1 << (o & 7)))) { bm[o >> 3] |= 1 << (o & 7); added++; }
+        }
+        let b64 = ''; const CH = 8192;
+        for (let i = 0; i < bm.length; i += CH) b64 += String.fromCharCode.apply(null, bm.subarray(i, i + CH));
+        b64 = btoa(b64);
+        tx.update(solRef, { status: 'approved', reviewedBy: user.email });
+        tx.set(mapRef, { b64 });
+        const done = (statDoc.exists() ? statDoc.data().done || 0 : 0) + added;
+        tx.set(statRef, { done, total: T.reps.length });
+      });
+      notify();
+    },
+    async mods() {
+      const out = [];
+      try { (await F.getDocs(F.collection(fs, 'moderators'))).forEach(d => out.push({ uid: d.id, ...d.data() }));
+        (await F.getDocs(F.collection(fs, 'moderatorInvites'))).forEach(d => out.push({ email: d.id, invite: true, ...d.data() })); } catch {}
+      return out;
+    },
+    async invite(email) { await F.setDoc(F.doc(fs, 'moderatorInvites', email.toLowerCase()), { addedBy: user.email }); notify(); },
+    async revoke(key) {
+      try { await F.deleteDoc(F.doc(fs, 'moderators', key)); } catch {}
+      try { await F.deleteDoc(F.doc(fs, 'moderatorInvites', key)); } catch {}
+      notify();
+    },
+  };
+}
+
+/* ---------------- router + shell ---------------- */
+const app = () => $('#app');
+function nav() {
+  const route = location.hash || '#/';
+  const tab = (href, label) => h('a', { href, class: 'navlink' + (route === href || (href !== '#/' && route.startsWith(href)) ? ' on' : '') }, label);
+  const u = DB.user;
+  return h('header', { class: 'topbar' },
+    h('a', { href: '#/', class: 'wordmark' }, h('span', { class: 'tri', 'aria-hidden': 'true' }), 'PYRAMINX ', h('b', null, 'OO')),
+    h('nav', { class: 'navtabs' },
+      tab('#/', 'Atlas'), tab('#/browse', 'Browse by depth'),
+      DB.isMod ? tab('#/mod', 'Moderation') : null, tab('#/about', 'How it works')),
+    h('div', { class: 'authbox' },
+      DB.mode === 'demo' ? h('span', { class: 'demobadge', title: 'No Firebase config yet \u2014 data stays in this browser' }, 'demo mode') : null,
+      u ? h('span', { class: 'whoami' }, u.name || u.email) : null,
+      u ? h('button', { class: 'ghost', onclick: () => DB.signOut() }, 'Sign out')
+        : h('button', { class: 'primary', onclick: () => DB.signIn().catch(e => toast(e.message)) }, 'Sign in with Google')));
+}
+function toast(msg) {
+  const t = h('div', { class: 'toast' }, msg);
+  document.body.appendChild(t);
+  setTimeout(() => t.classList.add('show'), 16);
+  setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 350); }, 3200);
+}
+async function render() {
+  const route = location.hash || '#/';
+  const root = app(); root.innerHTML = '';
+  root.appendChild(nav());
+  const main = h('main', { class: 'page' }); root.appendChild(main);
+  if (!T.ready) { main.appendChild($('#boot-status').cloneNode(true)); return; }
+  try {
+    if (route.startsWith('#/c/')) await pageClass(main, parseInt(route.slice(4), 10));
+    else if (route.startsWith('#/browse')) await pageBrowse(main, route);
+    else if (route.startsWith('#/mod')) await pageMod(main);
+    else if (route.startsWith('#/about')) pageAbout(main);
+    else await pageHome(main);
+  } catch (err) {
+    main.appendChild(h('div', { class: 'card error' }, 'Something went wrong rendering this page: ' + err.message));
+  }
+}
+
+/* ---------------- home ---------------- */
+function mountainSVG(pct) {
+  // signature element: the Mountain — an 11-row subdivided triangle (121 cells) filling bottom-up
+  const cells = []; let n = 0; const total = 121;
+  const filled = Math.round(pct * total);
+  for (let r = 0; r < 11; r++) {
+    for (let k = 0; k < 2 * r + 1; k++) {
+      // bottom rows fill first
+      const ordinal = total - (r + 1) * (r + 1) + k;
+      const on = ordinal < filled;
+      const up = k % 2 === 0;
+      const col = Math.floor(k / 2);
+      const W = 30, H = 26, x0 = 300 - (r + 1) * (W / 2), y0 = r * H;
+      const ax = x0 + col * W + (up ? 0 : W / 2);
+      const pts = up
+        ? `${ax + W/2},${y0} ${ax},${y0 + H} ${ax + W},${y0 + H}`
+        : `${ax + W/2},${y0 + H} ${ax},${y0} ${ax + W},${y0}`;
+      const tone = on ? ['#3fbf52', '#f2cf3c', '#3a7fe8', '#e8473d'][(r + k) % 4] : 'none';
+      cells.push(`<polygon points="${pts}" fill="${on ? tone : 'rgba(180,196,224,.06)'}" stroke="rgba(180,196,224,.16)" stroke-width="1" class="mcell${on ? ' lit' : ''}" style="transition-delay:${(ordinal % 40) * 12}ms"/>`);
+      n++;
+    }
+  }
+  return `<svg viewBox="-2 -2 604 292" class="mountain" role="img" aria-label="progress: ${(pct*100).toFixed(2)}% of positions solved">${cells.join('')}</svg>`;
+}
+async function pageHome(main) {
+  const stats = await DB.stats();
+  const pct = stats.total ? stats.done / stats.total : 0;
+  const hero = h('section', { class: 'hero' },
+    h('div', { class: 'heroleft' },
+      h('p', { class: 'eyebrow' }, 'A community census of every Pyraminx position'),
+      h('h1', null, 'One best human solution for every position. All ', h('em', null, fmt(T.reps.length)), ' of them.'),
+      h('p', { class: 'lede' },
+        'Every reachable Pyraminx state, condensed by its 12 rotations with mirrors side by side. ',
+        'Pick a scramble, solve it better than anyone has, and put your name on it.'),
+      h('div', { class: 'statline' },
+        h('span', { class: 'stat' }, h('b', null, fmt(stats.done)), ' solved'),
+        h('span', { class: 'stat' }, h('b', null, fmt(stats.total - stats.done)), ' remaining'),
+        h('span', { class: 'stat pctstat' }, h('b', null, (pct * 100).toFixed(pct > 0 && pct < 0.0001 ? 4 : 2) + '%'), ' complete')),
+      h('div', { class: 'barwrap', role: 'progressbar', 'aria-valuenow': (pct*100).toFixed(2), 'aria-valuemin': '0', 'aria-valuemax': '100' },
+        h('div', { class: 'bar', style: 'width:' + Math.max(pct * 100, pct > 0 ? 0.5 : 0) + '%' }))),
+    h('div', { class: 'heroright', html: mountainSVG(pct) }));
+  requestAnimationFrame(() => requestAnimationFrame(() => hero.querySelectorAll('.mcell.lit').forEach(c => c.classList.add('in'))));
+
+  const searchBox = h('div', { class: 'searchrow' },
+    h('input', { class: 'searchin mono', placeholder: "Paste any scramble \u2014 tips like l r b u are ignored \u2026  e.g.  R U' B L' U R' B'",
+      'aria-label': 'scramble search',
+      onkeydown: ev => { if (ev.key === 'Enter') doSearch(ev.target); } }),
+    h('button', { class: 'primary', onclick: ev => doSearch(ev.target.parentElement.querySelector('input')) }, 'Find this scramble'));
+  function doSearch(input) {
+    const txt = input.value.trim();
+    if (!txt) return;
+    const parsed = E.parseAlg(txt);
+    if (!parsed) { toast('Could not read that scramble \u2014 allowed: U L R B with \u2032 or 2, tips are ignored.'); return; }
+    const st = E.applyParsed(parsed, E.solved(), T.syms, T.rotByCorner);
+    const cid = canonOf(st);
+    location.hash = '#/c/' + Math.min(cid, mirrorOf(E.unidx(cid)));
+  }
+  const how = h('section', { class: 'trio' },
+    h('div', { class: 'card' }, h('h3', null, '1 \u00b7 Pick a position'),
+      h('p', null, 'Search a scramble from your timer, or browse by depth and take on positions one at a time.')),
+    h('div', { class: 'card' }, h('h3', null, '2 \u00b7 Submit your best solution'),
+      h('p', null, 'Up to 15 moves. Rotations are free, wide moves and doubles count as one. The site checks it actually solves the scramble \u2014 in any rotation, on either mirror.')),
+    h('div', { class: 'card' }, h('h3', null, '3 \u00b7 Moderators publish it'),
+      h('p', null, 'One approved solution marks the position and its mirror done. Mirrored solutions are generated automatically.')));
+  const randBtn = h('div', { class: 'centerrow' },
+    h('button', { class: 'ghost big', onclick: async () => {
+      const bm = await DB.doneMap();
+      for (let tries = 0; tries < 4000; tries++) {
+        const o = Math.floor(Math.random() * T.reps.length);
+        if (!(bm[o >> 3] & (1 << (o & 7)))) { const cid = T.reps[o]; location.hash = '#/c/' + Math.min(cid, mirrorOf(E.unidx(cid))); return; }
+      }
+      toast('Could not find an unsolved position \u2014 the mountain may be climbed.');
+    } }, 'Take me to an unsolved position'));
+  main.append(hero, searchBox, how, randBtn);
+}
+
+/* ---------------- class / pair page ---------------- */
+function copyBtn(text) {
+  return h('button', { class: 'copy', title: 'Copy', onclick: ev => {
+    (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject())
+      .then(() => toast('Copied'))
+      .catch(() => { const ta = h('textarea', null, text); document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); toast('Copied'); });
+  } }, '\u2398');
+}
+function sidePanel(side, label, doneSet) {
+  const wrap = h('div', { class: 'sidepanel' },
+    h('div', { class: 'sidehead' },
+      h('span', { class: 'sidelabel' }, label),
+      h('span', { class: 'depthchip d' + side.depth }, side.depth + ' moves deep'),
+      doneSet && doneSet.has(side.id) ? h('span', { class: 'donechip' }, '\u2713 solved') : null,
+      h('span', { class: 'ordinal' }, '#' + fmt(side.ord + 1))),
+    h('div', { class: 'netwrap', html: R.netSVG(side.state, 230) }),
+    h('div', { class: 'scrline' }, h('span', { class: 'scrlabel' }, 'scramble'), h('code', { class: 'mono scr' }, side.scramble || '(solved)'), side.scramble ? copyBtn(side.scramble) : null));
+  // symmetry strip
+  const strip = h('div', { class: 'symstrip' });
+  const detail = h('div', { class: 'symdetail' });
+  side.variants.forEach((v, i) => {
+    const b = h('button', { class: 'symthumb', title: 'rotation variant ' + (i + 1),
+      onclick: () => {
+        strip.querySelectorAll('.symthumb').forEach(x => x.classList.remove('on'));
+        b.classList.add('on');
+        const show = rand => {
+          const scr = E.optimalScramble(v.state, T.dist, rand) || '(solved)';
+          detail.innerHTML = '';
+          detail.append(
+            h('span', { class: 'scrlabel' }, 'optimal scramble to this view'),
+            h('code', { class: 'mono scr' }, scr), copyBtn(scr),
+            h('button', { class: 'ghost sm', onclick: () => show(true) }, 'another'));
+        };
+        show(false);
+      }, html: R.netSVG(v.state, 72, { cls: 'oonet thumb' }) });
+    strip.appendChild(b);
+  });
+  wrap.append(h('div', { class: 'symhead' }, side.variants.length + (side.variants.length === 1 ? ' unique view' : ' unique views'), h('span', { class: 'hintt' }, ' \u2014 click one for its optimal scramble')), strip, detail);
+  return wrap;
+}
+async function pageClass(main, anyId) {
+  if (!(anyId >= 0) || anyId >= E.NSLOTS || T.dist[anyId] < 0) { main.appendChild(h('div', { class: 'card error' }, 'That position id does not exist.')); return; }
+  let st = E.unidx(anyId);
+  const cid = canonOf(st);
+  const pair = pairOf(cid);
+  if (parseInt(location.hash.slice(4), 10) !== pair.pairId) { location.hash = '#/c/' + pair.pairId; return; }
+
+  const sols = await DB.pairSolutions(pair.pairId);
+  const doneSet = new Set();
+  for (const s of sols) if (s.status === 'approved') { doneSet.add(s.classId); doneSet.add(s.partnerId); }
+
+  main.appendChild(h('div', { class: 'crumbs' },
+    h('a', { href: '#/browse/' + pair.a.depth }, 'depth ' + pair.a.depth), ' / position #' + fmt(pair.a.ord + 1)));
+
+  const panels = h('section', { class: 'pairrow' + (pair.self ? ' single' : '') },
+    sidePanel(pair.a, pair.self ? 'self-mirror position' : 'position', doneSet),
+    pair.self ? null : sidePanel(pair.b, 'LR mirror', doneSet));
+  main.appendChild(panels);
+
+  /* solutions */
+  const solCard = h('section', { class: 'card solcard' }, h('h3', null, 'Solutions'));
+  const approved = sols.filter(s => s.status === 'approved');
+  const mine = sols.filter(s => s.status === 'pending');
+  if (!approved.length) solCard.appendChild(h('p', { class: 'empty' }, 'No approved solution yet \u2014 this position is unclaimed. Submit yours below.'));
+  for (const s of approved) {
+    const mirrored = E.mirrorAlg(s.solution);
+    const enteredLeft = s.classId === pair.a.id;
+    solCard.appendChild(h('div', { class: 'solrow' },
+      h('div', { class: 'solcell' },
+        h('span', { class: 'soltag' }, pair.self ? 'solution' : (enteredLeft ? 'position' : 'mirror')),
+        h('code', { class: 'mono sol' }, s.solution), copyBtn(s.solution)),
+      pair.self ? null : h('div', { class: 'solcell' },
+        h('span', { class: 'soltag auto' }, (enteredLeft ? 'mirror' : 'position') + ' \u00b7 auto-mirrored'),
+        h('code', { class: 'mono sol' }, mirrored), copyBtn(mirrored)),
+      h('div', { class: 'solmeta' }, s.moves + ' moves', s.showName && s.name ? ' \u00b7 by ' + s.name : '')));
+  }
+  for (const s of mine) solCard.appendChild(h('div', { class: 'solrow pending' },
+    h('div', { class: 'solcell' }, h('span', { class: 'soltag' }, 'yours \u00b7 awaiting review'), h('code', { class: 'mono sol' }, s.solution)),
+    h('div', { class: 'solmeta' }, s.moves + ' moves')));
+  main.appendChild(solCard);
+
+  /* submit */
+  const sub = h('section', { class: 'card subcard' }, h('h3', null, 'Submit a solution'));
+  if (!DB.user) {
+    sub.appendChild(h('p', null, 'Sign in with Google to submit. Anyone can browse \u2014 only submissions need an account.'));
+    sub.appendChild(h('button', { class: 'primary', onclick: () => DB.signIn().catch(e => toast(e.message)) }, 'Sign in with Google'));
+  } else {
+    const ta = h('textarea', { class: 'mono solin', rows: '2',
+      placeholder: "e.g.  [r] L U' Rw B2 U L'   \u2014 rotations free \u00b7 wides & doubles 1 move \u00b7 tips ignored \u00b7 max 15" });
+    const status = h('div', { class: 'verifyline' }, 'Type a solution \u2014 it is checked live against every rotation of both mirrors.');
+    const nameRow = h('label', { class: 'namerow' },
+      h('input', { type: 'checkbox', checked: '' }), ' show my name (', DB.user.name || DB.user.email, ') on this solution');
+    const btn = h('button', { class: 'primary', disabled: '' }, 'Submit for review');
+    let lastVerify = null;
+    const onInput = () => {
+      const v = verifySolution(ta.value, pair); lastVerify = v;
+      status.className = 'verifyline ' + (v.ok ? 'good' : (ta.value.trim() ? 'bad' : ''));
+      status.textContent = v.ok
+        ? '\u2713 Solves the ' + (pair.self || v.side === 'a' ? 'position' : 'mirror') + ' in ' + v.moves + ' moves. Ready to submit.'
+        : (ta.value.trim() ? v.error : 'Type a solution \u2014 it is checked live against every rotation of both mirrors.');
+      if (v.ok) btn.removeAttribute('disabled'); else btn.setAttribute('disabled', '');
+    };
+    ta.addEventListener('input', onInput);
+    btn.addEventListener('click', async () => {
+      const v = lastVerify; if (!v || !v.ok) return;
+      const sideObj = v.side === 'b' && pair.b ? pair.b : pair.a;
+      const partner = pair.self ? sideObj : (v.side === 'a' ? (pair.b || pair.a) : pair.a);
+      btn.setAttribute('disabled', '');
+      try {
+        await DB.submit({
+          pairId: pair.pairId, classId: sideObj.id, partnerId: partner.id,
+          scramble: sideObj.scramble, solution: ta.value.trim().replace(/\s+/g, ' '),
+          moves: v.moves, name: DB.user.name || DB.user.email, showName: nameRow.querySelector('input').checked,
+        });
+        toast('Submitted \u2014 a moderator will review it.');
+        render();
+      } catch (err) { toast('Submit failed: ' + err.message); btn.removeAttribute('disabled'); }
+    });
+    sub.append(ta, status, nameRow, btn);
+  }
+  main.appendChild(sub);
+}
+
+/* ---------------- browse ---------------- */
+async function pageBrowse(main, route) {
+  const m = route.match(/^#\/browse\/?(\d+)?(?:\/p(\d+))?/);
+  const depth = m && m[1] !== undefined ? +m[1] : 5;
+  const page = m && m[2] ? +m[2] : 0;
+  const bm = await DB.doneMap();
+  const isDone = o => !!(bm[o >> 3] & (1 << (o & 7)));
+
+  const chips = h('div', { class: 'depthchips' });
+  for (let d = 0; d <= 11; d++) {
+    const list = T.depthIdx[d];
+    let done = 0; for (const o of list) if (isDone(o)) done++;
+    chips.appendChild(h('a', { href: '#/browse/' + d, class: 'depthsel d' + d + (d === depth ? ' on' : '') },
+      h('b', null, String(d)), h('span', null, done + '/' + fmt(list.length))));
+  }
+  main.appendChild(h('section', { class: 'browsehead' },
+    h('h2', null, 'Every position, sorted by depth'),
+    h('p', { class: 'lede sm' }, 'Depth is the proven minimum number of moves. Click a position to see its mirrors, its rotations, and the solutions on record.'),
+    chips));
+
+  const list = T.depthIdx[depth];
+  const PER = 48, pages = Math.max(1, Math.ceil(list.length / PER));
+  const pg = Math.min(page, pages - 1);
+  const grid = h('div', { class: 'classgrid' });
+  for (let i = pg * PER; i < Math.min(list.length, (pg + 1) * PER); i++) {
+    const o = list[i], cid = T.reps[o];
+    const st = E.unidx(cid);
+    grid.appendChild(h('a', { href: '#/c/' + Math.min(cid, mirrorOf(st)), class: 'classcell' + (isDone(o) ? ' done' : '') },
+      h('div', { html: R.netSVG(st, 92, { cls: 'oonet thumb' }) }),
+      h('div', { class: 'cellmeta' }, '#' + fmt(o + 1), isDone(o) ? h('span', { class: 'tick' }, ' \u2713') : null)));
+  }
+  main.appendChild(grid);
+  const pager = h('div', { class: 'pager' },
+    h('a', { href: '#/browse/' + depth + '/p' + Math.max(0, pg - 1), class: 'ghost' + (pg === 0 ? ' off' : '') }, '\u2190 previous'),
+    h('span', { class: 'pginfo' }, 'page ' + fmt(pg + 1) + ' of ' + fmt(pages) + ' \u00b7 ' + fmt(list.length) + ' positions at depth ' + depth),
+    h('a', { href: '#/browse/' + depth + '/p' + Math.min(pages - 1, pg + 1), class: 'ghost' + (pg >= pages - 1 ? ' off' : '') }, 'next \u2192'),
+    h('button', { class: 'ghost', onclick: () => {
+      const un = list.filter(o => !isDone(o));
+      if (!un.length) { toast('Every position at this depth is solved.'); return; }
+      const o = un[Math.floor(Math.random() * un.length)];
+      const st = E.unidx(T.reps[o]);
+      location.hash = '#/c/' + Math.min(T.reps[o], mirrorOf(st));
+    } }, 'random unsolved at this depth'));
+  main.appendChild(pager);
+}
+
+/* ---------------- moderation ---------------- */
+async function pageMod(main) {
+  if (!DB.isMod) { main.appendChild(h('div', { class: 'card error' }, 'Moderation is for moderators \u2014 sign in with a moderator account.')); return; }
+  const items = await DB.pending();
+  const head = h('h2', null, 'Review queue \u00b7 ' + items.length + ' pending');
+  main.appendChild(head);
+  if (!items.length) main.appendChild(h('p', { class: 'empty' }, 'Nothing waiting. The queue refreshes when you reopen this tab.'));
+  for (const s of items) {
+    const pr = pairOf(s.classId);
+    const v = verifySolution(s.solution, pr);
+    const row = h('section', { class: 'card modrow' },
+      h('div', { class: 'modleft', html: R.netSVG(E.unidx(s.classId), 120, { cls: 'oonet thumb' }) }),
+      h('div', { class: 'modbody' },
+        h('div', { class: 'scrline' }, h('span', { class: 'scrlabel' }, 'scramble'), h('code', { class: 'mono scr' }, s.scramble)),
+        h('div', { class: 'scrline' }, h('span', { class: 'scrlabel' }, 'solution'), h('code', { class: 'mono sol' }, s.solution)),
+        h('div', { class: 'verifyline ' + (v.ok ? 'good' : 'bad') },
+          v.ok ? '\u2713 verified \u00b7 ' + s.moves + ' moves \u00b7 by ' + (s.name || 'anonymous') + (s.showName ? '' : ' (name hidden)')
+               : '\u2717 fails verification now: ' + v.error)),
+      h('div', { class: 'modacts' },
+        h('button', { class: 'primary', disabled: v.ok ? null : '', onclick: async ev => {
+          ev.target.setAttribute('disabled', '');
+          try { await DB.review(s.id, 'approved'); toast('Approved \u2014 position marked solved.'); render(); }
+          catch (err) { toast('Approve failed: ' + err.message); ev.target.removeAttribute('disabled'); }
+        } }, 'Approve'),
+        h('button', { class: 'danger', onclick: async () => { await DB.review(s.id, 'rejected'); toast('Rejected.'); render(); } }, 'Reject'),
+        h('a', { class: 'ghost', href: '#/c/' + s.pairId }, 'open position')));
+    main.appendChild(row);
+  }
+  /* moderators */
+  const mc = h('section', { class: 'card' }, h('h3', null, 'Moderators'));
+  const mods = await DB.mods();
+  const tbl = h('div', { class: 'modlist' });
+  for (const mEntry of mods) tbl.appendChild(h('div', { class: 'modent' },
+    h('span', null, mEntry.email || mEntry.uid, mEntry.invite ? ' \u00b7 invited, not yet signed in' : ''),
+    DB.isAdmin ? h('button', { class: 'ghost sm', onclick: async () => { await DB.revoke(mEntry.invite ? mEntry.email : mEntry.uid); render(); } }, 'remove') : null));
+  if (!mods.length) tbl.appendChild(h('p', { class: 'empty' }, 'No additional moderators yet.'));
+  const inv = h('div', { class: 'inviterow' },
+    h('input', { class: 'searchin', placeholder: 'google account email', 'aria-label': 'moderator email' }),
+    h('button', { class: 'primary', onclick: async ev => {
+      const em = ev.target.parentElement.querySelector('input').value.trim().toLowerCase();
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) { toast('Enter a valid email.'); return; }
+      await DB.invite(em); toast('Invited \u2014 they become a moderator the next time they sign in.'); render();
+    } }, 'Add moderator'));
+  mc.append(tbl, inv);
+  main.appendChild(mc);
+}
+
+/* ---------------- about ---------------- */
+function pageAbout(main) {
+  main.appendChild(h('section', { class: 'card prose' },
+    h('h2', null, 'How Pyraminx OO works'),
+    h('p', null, 'The Pyraminx (ignoring trivial tips) has exactly 933,120 positions, and every one of them can be solved in 11 moves or fewer \u2014 that is proven by computer. What no computer can decide is which short solution feels best in human hands. This site collects the community\u2019s answer, one position at a time.'),
+    h('h3', null, 'Positions, rotations and mirrors'),
+    h('p', null, 'Rotating the whole puzzle does not change the solve, so the 933,120 raw states condense into ' + fmt(T.reps.length) + ' positions \u2014 each covering up to 12 rotations, which you can flip through on any position page. Left\u2013right mirror images are different solves with mirrored algorithms, so a position and its mirror are shown side by side: submit either, and the mirrored solution is generated automatically. One approved solution marks both done.'),
+    h('h3', null, 'Notation'),
+    h('div', { class: 'nottable' },
+      nrow('U L R B', 'face moves \u00b7 1 move each', "U' or U2 both mean the inverse turn \u2014 still 1 move"),
+      nrow('Uw Lw Rw Bw', 'wide moves \u00b7 1 move each', "convention: Rw = L [l\u2032], Lw = R [r\u2032], Uw = B [b\u2032], Bw = U [u\u2032]"),
+      nrow('[u] [l] [r] [b], y', 'rotations \u00b7 0 moves', 'rotate the whole puzzle; y is the same as [u]'),
+      nrow('u l r b (lowercase)', 'tips \u00b7 ignored', 'pasted scrambles can include tip moves \u2014 they are stripped')),
+    h('h3', null, 'Submitting and review'),
+    h('p', null, 'Solutions are at most 15 moves and are verified automatically: they must genuinely solve the scramble, viewed from any rotation, on either mirror. A moderator then reviews each submission before it is published \u2014 verification is checked again at review time. The first approved solution claims the position.'),
+    h('h3', null, 'Privacy'),
+    h('p', null, 'Anyone can browse without an account. Submitting requires Google sign-in; your name appears on a solution only if you leave \u201cshow my name\u201d checked.')));
+  if (DB.user) main.appendChild(h('section', { class: 'card prose' },
+    h('h3', null, 'Your account'),
+    h('p', null, 'Signed in as ' + (DB.user.email || DB.user.name) + '.'),
+    h('div', { class: 'scrline' }, h('span', { class: 'scrlabel' }, 'user id'),
+      h('code', { class: 'mono scr' }, DB.user.uid), copyBtn(DB.user.uid)),
+    h('p', null, 'The site owner pastes this id into the Firestore security rules to become the admin (see SETUP.md).')));
+  function nrow(a, b, c) {
+    return h('div', { class: 'nrow' }, h('code', { class: 'mono' }, a), h('b', null, b), h('span', null, c));
+  }
+}
+
+/* ---------------- boot ---------------- */
+async function boot() {
+  const bootEl = $('#boot-status');
+  const label = $('#boot-label'), barEl = $('#boot-bar');
+  const report = (stage, n, total) => {
+    const names = { cache: 'Loading cached tables', bfs: 'Mapping all 933,120 positions', classes: 'Condensing symmetries' };
+    label.textContent = (names[stage] || stage) + '\u2026';
+    barEl.style.width = Math.round(100 * n / total) + '%';
+  };
+  DB = (CFG.firebase && CFG.firebase.apiKey) ? liveDB(CFG.firebase) : demoDB();
+  DB.onChange(() => render());
+  const dbInit = DB.init().catch(e => toast('Database connection failed: ' + e.message));
+  await buildTables(report);
+  await dbInit;
+  bootEl.classList.add('gone');
+  render();
+}
+window.addEventListener('hashchange', render);
+window.addEventListener('DOMContentLoaded', boot);
+window.OOApp = { verifySolution, pairOf, T, get DB() { return DB; }, ordinalOf };
+})();
+
+</script>
+</body>
+</html>
