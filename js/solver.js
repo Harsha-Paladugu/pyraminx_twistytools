@@ -72,7 +72,9 @@ async function boot() {
   syms = E.buildSyms(); rotBy = E.makeFrames(syms);
   rotations = C.buildRotations();
   rep('Ready', 1, 1);
-  $('#boot-status').classList.add('gone');
+  const bootEl = $('#boot-status');
+  bootEl.classList.add('gone');
+  setTimeout(() => bootEl.remove(), 500);
   render();
 }
 
@@ -181,7 +183,7 @@ function slider(label, hint, key, min, max, step) {
       } }), val),
     h('div', { class: 'sliderhint' }, hint));
 }
-function render() {
+function renderInner() {
   const root = $('#app'); root.innerHTML = '';
   root.appendChild(new SiteNavbar({ active: 'solver' }).element());
   const main = h('main', { class: 'page' }); root.appendChild(main);
@@ -304,6 +306,16 @@ function render() {
   if (UI.state && UI.dopt === 0) main.appendChild(h('p', { class: 'empty' }, 'Nothing to solve \u2014 that scramble leaves the puzzle solved.'));
   if (!UI.state) main.appendChild(h('p', { class: 'empty hintline' }, 'The badge on each solution reads like \u201cL4E 3+6\u22122\u201d: a 3-move V, a 6-move finish, 2 moves canceled at the junction.'));
 }
+function render() {
+  try { renderInner(); }
+  catch (err) {
+    const root = $('#app'); root.innerHTML = '';
+    const card = h('div', { class: 'card solcard', style: 'margin:48px auto;max-width:680px;border-color:rgba(232,71,61,.5)' },
+      'Something went wrong rendering this page: ' + err.message);
+    root.appendChild(card);
+  }
+}
+window.addEventListener('error', ev => { try { toast('Page error: ' + ev.message); } catch (e) {} });
 window.OOSolver = { get UI() { return UI; }, runSearch, onSolve, get C() { return C; } };
 window.addEventListener('DOMContentLoaded', boot);
 })();

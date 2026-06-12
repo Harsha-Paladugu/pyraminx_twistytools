@@ -351,12 +351,12 @@ function toast(msg) {
   setTimeout(() => t.classList.add('show'), 16);
   setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 350); }, 3200);
 }
-async function render() {
+async function renderInner() {
   const route = location.hash || '#/';
   const root = app(); root.innerHTML = '';
   root.appendChild(nav());
   const main = h('main', { class: 'page' }); root.appendChild(main);
-  if (!T.ready) { main.appendChild($('#boot-status').cloneNode(true)); return; }
+  if (!T.ready) { const b = $('#boot-status'); if (b) main.appendChild(b.cloneNode(true)); return; }
   try {
     if (route.startsWith('#/c/')) await pageClass(main, parseInt(route.slice(4), 10));
     else if (route.startsWith('#/browse')) await pageBrowse(main, route);
@@ -712,8 +712,18 @@ async function boot() {
   await buildTables(report);
   await dbInit;
   bootEl.classList.add('gone');
+  setTimeout(() => bootEl.remove(), 500); // the overlay physically leaves the DOM
   render();
 }
+async function render() {
+  try { await renderInner(); }
+  catch (err) {
+    const root = app(); root.innerHTML = '';
+    root.appendChild(h('div', { class: 'card error', style: 'margin:48px auto;max-width:680px' },
+      'Something went wrong rendering this page: ' + err.message));
+  }
+}
+window.addEventListener('error', ev => { try { toast('Page error: ' + ev.message); } catch (e) {} });
 window.addEventListener('hashchange', render);
 window.addEventListener('DOMContentLoaded', boot);
 window.OOApp = { verifySolution, pairOf, T, get DB() { return DB; }, ordinalOf };
