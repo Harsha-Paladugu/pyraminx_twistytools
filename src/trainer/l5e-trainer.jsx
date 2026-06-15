@@ -134,6 +134,29 @@ function buildVBuckets(dist, vdist) {
   for (let i = 0; i < SPACE; i++) { if (dist[i] < 0) continue; buckets[vdist[i]].push(i); }
   return buckets;
 }
+// Pseudo V: parse a comma-separated offset list ("R, R', L R'") into move
+// sequences (each <=4 plain moves); null if anything is invalid or empty.
+function parsePseudoOffsets(str) {
+  const parts = String(str).split(",").map((x) => x.trim()).filter(Boolean);
+  const out = [];
+  for (const p of parts) {
+    const toks = p.split(/\s+/).filter(Boolean);
+    if (!toks.length || toks.length > 4) return null;
+    const moves = [];
+    for (const t of toks) {
+      const m = t.match(/^([URLB])(['2]?)$/);
+      if (!m) return null;
+      moves.push({ f: m[1], inv: !!m[2] });
+    }
+    out.push({ str: p, moves });
+  }
+  return out.length ? out : null;
+}
+function applyOffset(off, s) {
+  const t = copyState(s);
+  for (const mv of off.moves) applyMove(t, mv.f, mv.inv);
+  return t;
+}
 
 // randomized optimal solution: state -> solved, ties broken at random
 function solveMoves(s, dist) {
@@ -584,7 +607,9 @@ export default function L5ETrainer() {
   const [last, setLast] = useState(null);
   const [caseStats, setCaseStats] = useState({});
   const [vfs, setVfs] = useState({});            // Solution Trainer accuracy, keyed by solution length
-  const [guessMsg, setGuessMsg] = useState("");  // Solution Trainer: transient "too low" message
+  const [guessMsg, setGuessMsg] = useState("");  // Solution / Pseudo: transient "too low" message
+  const [pso, setPso] = useState("R, R'");       // Pseudo V offsets (comma-separated)
+  const [psStats, setPsStats] = useState({});    // Pseudo V accuracy, keyed by pseudo length
   const [session, setSession] = useState([]);
   const [recap, setRecap] = useState(null);
   const [expandedSet, setExpandedSet] = useState(null);
@@ -612,12 +637,18 @@ export default function L5ETrainer() {
           }
           if (d.bar) setBar(d.bar);
           if (Array.isArray(d.selected)) setSelected(new Set(d.selected.filter((id) => SET_BY_ID[id])));
-          if (["drill", "recap", "solution"].includes(d.mode)) setMode(d.mode);
+          if (["drill", "recap", "solution", "pseudo"].includes(d.mode)) setMode(d.mode);
           if (Array.isArray(d.vlen)) setVlenSel(new Set(d.vlen.filter((n) => n >= 1 && n <= 7)));
           if (d.vfs && typeof d.vfs === "object") {
             const v = {};
             for (const [k, st] of Object.entries(d.vfs)) if (/^[1-7]$/.test(k)) v[k] = st;
             setVfs(v);
+          }
+          if (typeof d.pso === "string") setPso(d.pso);
+          if (d.psf && typeof d.psf === "object") {
+            const v = {};
+            for (const [k, st] of Object.entries(d.psf)) if (/^[1-7]$/.test(k)) v[k] = st;
+            setPsStats(v);
           }
         }
       } catch (e) { /* first run */ }
@@ -640,10 +671,10 @@ export default function L5ETrainer() {
     clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
       try {
-        window.storage.set(STORE_KEY, JSON.stringify({ caseStats, bar, selected: [...selected], mode, vlen: [...vlenSel], vfs })).catch(() => {});
+        window.storage.set(STORE_KEY, JSON.stringify({ caseStats, bar, selected: [...selected], mode, vlen: [...vlenSel], vfs, pso, psf: psStats })).catch(() => {});
       } catch (e) {}
     }, 400);
-  }, [caseStats, bar, selected, mode, vlenSel, vfs]);
+  }, [caseStats, bar, selected, mode, vlenSel, vfs, pso, psStats]);
 
   const makeScramble = useCallback((setId, caseKey, presArr) => {
     let physical = null, scramble = null, uTwist = 0, target = 0;
@@ -741,31 +772,85 @@ export default function L5ETrainer() {
     setCurrent(makeSolutionScramble(vlenSel));
   }, [makeSolutionScramble, vlenSel]);
 
-  // Solution Trainer: grade the picked move count.
+  // Pseudo V: best (shortest) V reachable after one of the allowed offsets.
+  // The offset is "free" — vlen is the V length after the best pre-move.
+  const bestPseudo = useCallback((s, offs) => {
+    const vdist = vdistRef.current;
+    let vlen = 99, who = [];
+    for (const o of offs) {
+      const L = vdist[stateIndex(applyOffset(o, s))];
+      if (L < vlen) { vlen = L; who = [o]; } else if (L === vlen) who.push(o);
+    }
+    return { vlen, who };
+  }, []);
+
+  // Pseudo V: every optimal pseudo solution as "offset · V-moves"
+  const allOptimalPseudo = useCallback((s, offs) => {
+    const { who } = bestPseudo(s, offs);
+    const out = [];
+    for (const o of who) {
+      for (const vsol of allOptimalVs(applyOffset(o, s))) {
+        out.push(o.str + " · " + (vsol || "(already a V)"));
+        if (out.length >= 200) return out;
+      }
+    }
+    return out;
+  }, [bestPseudo, allOptimalVs]);
+
+  const makePseudoScramble = useCallback((psoStr) => {
+    const offs = parsePseudoOffsets(psoStr);
+    if (!offs) return null;
+    for (let attempt = 0; attempt < 400; attempt++) {
+      const k = 8 + Math.floor(Math.random() * 4);
+      const seq = []; let last = -1;
+      for (let n = 0; n < k; n++) { let mi; do { mi = Math.floor(Math.random() * 8); } while ((mi >> 1) === last); last = mi >> 1; seq.push(mi); }
+      const st = solvedState(); let uTwist = 0;
+      for (const mi of seq) { const nm = MOVE_NAMES[mi]; applyMove(st, nm[0], nm.includes("'")); if (nm[0] === "U") uTwist = (uTwist + (nm.includes("'") ? 2 : 1)) % 3; }
+      const { vlen } = bestPseudo(st, offs);
+      if (vlen >= 1 && vlen <= 7) {
+        return { kind: "pseudo", scramble: seq.map((mi) => MOVE_NAMES[mi]).join(" "), render: st, uTwist, vlen };
+      }
+    }
+    return null;
+  }, [bestPseudo]);
+
+  const committedPso = useRef("R, R'");
+  const nextPseudo = useCallback(() => {
+    committedPso.current = pso;
+    setPhase("ready"); setLast(null); setGuessMsg("");
+    setCurrent(makePseudoScramble(pso));
+  }, [makePseudoScramble, pso]);
+
+  // Solution / Pseudo: grade the picked move count.
   //   below optimal -> impossible: show an error, keep the same scramble (no reveal)
   //   == optimal     -> correct
   //   above optimal  -> a valid but non-optimal answer
   // For any answer >= optimal we reveal every optimal solution and advance.
   const submitGuess = useCallback((n) => {
-    if (!current || current.kind !== "solution" || phase === "stopped") return;
+    if (!current || (current.kind !== "solution" && current.kind !== "pseudo") || phase === "stopped") return;
     if (n < current.vlen) {
       setGuessMsg(`No solution in ${n} ${n === 1 ? "move" : "moves"} — the shortest is longer. Keep looking.`);
       return;
     }
     const correct = n === current.vlen;
     setGuessMsg("");
-    setLast({ kind: "solution", guess: n, correct, vlen: current.vlen, render: current.render, uTwist: current.uTwist, sols: allOptimalVs(current.render) });
+    const sols = current.kind === "pseudo"
+      ? allOptimalPseudo(current.render, parsePseudoOffsets(pso) || [])
+      : allOptimalVs(current.render);
+    setLast({ kind: current.kind, guess: n, correct, vlen: current.vlen, render: current.render, uTwist: current.uTwist, sols });
     setPhase("stopped");
-    setSession((s) => [...s.slice(-49), { kind: "solution", correct, vlen: current.vlen }]);
-    setVfs((v) => {
+    setSession((s) => [...s.slice(-49), { kind: current.kind, correct, vlen: current.vlen }]);
+    const setter = current.kind === "pseudo" ? setPsStats : setVfs;
+    setter((v) => {
       const key = String(current.vlen);
       const prev = v[key] || { n: 0, correct: 0 };
       return { ...v, [key]: { n: prev.n + 1, correct: prev.correct + (correct ? 1 : 0) } };
     });
-  }, [current, phase, allOptimalVs]);
+  }, [current, phase, allOptimalVs, allOptimalPseudo, pso]);
 
   const advance = useCallback(() => {
     if (mode === "solution") { nextSolution(); return; }
+    if (mode === "pseudo") { nextPseudo(); return; }
     if (mode === "drill") { nextDrill(); return; }
     setRecap((r) => {
       if (!r) return r;
@@ -775,13 +860,14 @@ export default function L5ETrainer() {
       setCurrent(makeScramble(it.set, it.caseKey, poolOf(it.set).classes.get(it.caseKey)));
       return { ...r, idx };
     });
-  }, [mode, nextDrill, nextSolution, makeScramble, poolOf]);
+  }, [mode, nextDrill, nextSolution, nextPseudo, makeScramble, poolOf]);
 
   useEffect(() => {
     if (!ready) return;
     setPhase("ready");
     setLast(null);
     if (mode === "solution") nextSolution();
+    else if (mode === "pseudo") nextPseudo();
     else if (mode === "drill") nextDrill();
     else startRecap();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -826,10 +912,13 @@ export default function L5ETrainer() {
   useEffect(() => {
     const down = (e) => {
       if (e.repeat) return;
+      const tag = e.target && e.target.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;  // don't hijack keys while typing (e.g. offsets)
       if (panel) { if (e.code === "Escape") setPanel(null); return; }
-      if (mode === "solution") {
+      if (mode === "solution" || mode === "pseudo") {
+        const goNext = mode === "pseudo" ? nextPseudo : nextSolution;
         if (phase === "stopped") {
-          if (e.code === "Space" || e.code === "Enter" || e.code === "NumpadEnter") { e.preventDefault(); nextSolution(); }
+          if (e.code === "Space" || e.code === "Enter" || e.code === "NumpadEnter") { e.preventDefault(); goNext(); }
           return;
         }
         const m = e.code.match(/^(?:Digit|Numpad)([1-7])$/);
@@ -841,7 +930,7 @@ export default function L5ETrainer() {
     };
     window.addEventListener("keydown", down);
     return () => window.removeEventListener("keydown", down);
-  }, [phase, trigger, stopTimer, panel, mode, submitGuess, nextSolution]);
+  }, [phase, trigger, stopTimer, panel, mode, submitGuess, nextSolution, nextPseudo]);
 
   useEffect(() => () => cancelAnimationFrame(raf.current), []);
 
@@ -882,9 +971,10 @@ export default function L5ETrainer() {
   const resetStats = () => {
     setCaseStats({});
     setVfs({});
+    setPsStats({});
     setSession([]);
     setLast(null);
-    try { window.storage.set(STORE_KEY, JSON.stringify({ caseStats: {}, bar, selected: [...selected], mode, vlen: [...vlenSel], vfs: {} })).catch(() => {}); } catch (e) {}
+    try { window.storage.set(STORE_KEY, JSON.stringify({ caseStats: {}, bar, selected: [...selected], mode, vlen: [...vlenSel], vfs: {}, pso, psf: {} })).catch(() => {}); } catch (e) {}
   };
 
   return (
@@ -952,6 +1042,10 @@ export default function L5ETrainer() {
         .solhead { text-align: center; color: var(--faint); font-size: 11px; text-transform: uppercase; letter-spacing: .09em; margin: 14px 0 8px; }
         .sollist { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; max-height: 168px; overflow-y: auto; }
         .solpill { font-size: 13px; letter-spacing: .04em; color: var(--text); background: var(--panel2); border-radius: 7px; padding: 4px 10px; }
+        .offsetin { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; color: var(--text);
+          padding: 6px 10px; font-size: 13px; min-width: 180px; }
+        .offsetin:focus { outline: none; border-color: var(--accent); }
+        .offsetbad { color: #b04a42; font-size: 12px; }
         .reveal { display: flex; justify-content: center; align-items: center; gap: 9px; font-size: 13px; color: var(--dim); }
         .reveal .tag { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px;
           border-radius: 999px; font-weight: 500; color: var(--text); background: var(--panel2);
@@ -1052,7 +1146,7 @@ export default function L5ETrainer() {
           </div>
         )}
 
-        {mode !== "solution" && (
+        {mode !== "solution" && mode !== "pseudo" && (
           <>
             <div className="chips">
               <span className="grouplabel" style={{ marginLeft: 0 }}>L5E</span>
@@ -1084,7 +1178,20 @@ export default function L5ETrainer() {
           <button className={"mode" + (mode === "drill" ? " on" : "")} onClick={() => setMode("drill")}>Drill</button>
           <button className={"mode" + (mode === "recap" ? " on" : "")} onClick={() => setMode("recap")}>Recap</button>
           <button className={"mode" + (mode === "solution" ? " on" : "")} onClick={() => setMode("solution")}>Solution</button>
+          <button className={"mode" + (mode === "pseudo" ? " on" : "")} onClick={() => setMode("pseudo")}>Pseudo V</button>
         </div>
+
+        {mode === "pseudo" && (
+          <div className="chips" style={{ alignItems: "center" }}>
+            <span className="grouplabel" style={{ marginLeft: 0 }}>offsets</span>
+            <input className="offsetin mono" value={pso}
+              onChange={(e) => setPso(e.target.value)}
+              onBlur={() => { if (pso !== committedPso.current) nextPseudo(); }}
+              onKeyDown={(e) => { if (e.code === "Enter" || e.code === "NumpadEnter") { e.preventDefault(); e.target.blur(); } }}
+              placeholder="e.g. R, R', L R'" aria-label="pseudo offsets" />
+            {!parsePseudoOffsets(pso) ? <span className="offsetbad">enter valid offsets (plain moves, ≤4 each)</span> : null}
+          </div>
+        )}
 
         {mode === "solution" && (
           <>
@@ -1124,10 +1231,12 @@ export default function L5ETrainer() {
         ) : !current ? (
           <div className="stage" style={{ cursor: "default" }}>
             <div className="empty" style={{ padding: "40px 0", textAlign: "center" }}>
-              {mode === "solution" ? "Select at least one solution length to start." : "Select at least one set to start."}
+              {mode === "solution" ? "Select at least one solution length to start."
+                : mode === "pseudo" ? "Enter at least one valid offset above to start."
+                : "Select at least one set to start."}
             </div>
           </div>
-        ) : current.kind === "solution" ? (
+        ) : current.kind === "solution" || current.kind === "pseudo" ? (
           <div className="stage" style={{ cursor: "default" }}>
             <div className="stagegrid">
               <div className="scramble">{current.scramble}</div>
@@ -1142,9 +1251,12 @@ export default function L5ETrainer() {
                   <span className="tag" style={{ "--cdot": "var(--accent)" }}>
                     <span className="dot" />{last.vlen} {last.vlen === 1 ? "move" : "moves"}
                   </span>
-                  <button className="restart" style={{ marginTop: 0 }} onClick={nextSolution}>Next</button>
+                  <button className="restart" style={{ marginTop: 0 }} onClick={current.kind === "pseudo" ? nextPseudo : nextSolution}>Next</button>
                 </div>
-                <div className="solhead">{last.sols.length === 1 ? "optimal solution" : `${last.sols.length} optimal solutions`}</div>
+                <div className="solhead">
+                  {last.sols.length === 1 ? "optimal solution" : `${last.sols.length} optimal solutions`}
+                  {current.kind === "pseudo" ? " — offset · V (offset is free)" : ""}
+                </div>
                 <div className="sollist">
                   {last.sols.map((sol, i) => (
                     <span key={i} className="mono solpill">{sol}</span>
@@ -1153,7 +1265,11 @@ export default function L5ETrainer() {
               </>
             ) : (
               <>
-                <div className="hint" style={{ marginTop: 14 }}>How many moves is the shortest solution?</div>
+                <div className="hint" style={{ marginTop: 14 }}>
+                  {current.kind === "pseudo"
+                    ? "Shortest V after a free offset — how many moves?"
+                    : "How many moves is the shortest solution?"}
+                </div>
                 <div className="guessrow">
                   {[1, 2, 3, 4, 5, 6, 7].map((N) => (
                     <button key={N} className="guessbtn" onClick={() => submitGuess(N)}>{N}</button>
@@ -1203,6 +1319,30 @@ export default function L5ETrainer() {
                     <tbody>
                       {Object.keys(vfs).map(Number).sort((a, b) => a - b).map((L) => {
                         const a = vfs[String(L)];
+                        return (
+                          <tr key={L}>
+                            <td className="name">{L} moves</td>
+                            <td className="mono">{a.n}</td>
+                            <td className="mono">{a.correct}</td>
+                            <td className="mono">{Math.round((a.correct / a.n) * 100)}%</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
+              </>
+            ) : mode === "pseudo" ? (
+              <>
+                <h3>Pseudo V — accuracy by length</h3>
+                {Object.keys(psStats).length === 0 ? (
+                  <div className="empty">No answers yet. Pick the move count and your accuracy lands here, by pseudo length.</div>
+                ) : (
+                  <table>
+                    <thead><tr><th>Length</th><th>Seen</th><th>Correct</th><th>Accuracy</th></tr></thead>
+                    <tbody>
+                      {Object.keys(psStats).map(Number).sort((a, b) => a - b).map((L) => {
+                        const a = psStats[String(L)];
                         return (
                           <tr key={L}>
                             <td className="name">{L} moves</td>
@@ -1271,8 +1411,8 @@ export default function L5ETrainer() {
               <div className="times">
                 {session.slice(-24).map((t, i) => (
                   <span key={i} className="timepill"
-                    style={{ "--cdot": t.kind === "solution" ? (t.correct ? "var(--accent)" : "#b04a42") : (t.set ? SET_BY_ID[t.set].color : "var(--accent)") }}>
-                    {t.kind === "solution" ? (t.correct ? "✓" : "✗") : fmt(t.ms)}
+                    style={{ "--cdot": (t.kind === "solution" || t.kind === "pseudo") ? (t.correct ? "var(--accent)" : "#b04a42") : (t.set ? SET_BY_ID[t.set].color : "var(--accent)") }}>
+                    {(t.kind === "solution" || t.kind === "pseudo") ? (t.correct ? "✓" : "✗") : fmt(t.ms)}
                   </span>
                 ))}
               </div>
