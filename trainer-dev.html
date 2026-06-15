@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>L5E Trainer — dev build (staging)</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpolygon points='16,2 30,28 2,28' fill='%23f2cf3c'/%3E%3Cpolygon points='16,2 23,15 9,15' fill='%233fbf52'/%3E%3Cpolygon points='9,15 16,28 2,28' fill='%23e8473d'/%3E%3Cpolygon points='23,15 30,28 16,28' fill='%233a7fe8'/%3E%3C/svg%3E">
+</head>
+<body>
+<!-- Dev harness for the source build (js/trainer.build.js). Loads the staging
+     artifact, NOT the live js/trainer.js, so this page can run side-by-side
+     with the deployed trainer without affecting it. -->
+<div id="root"></div>
+<script>
+/* Isolated storage: namespaced key so testing the dev build never reads or
+   writes the real trainer's saved progress (live key: "l5e-trainer-v2"). */
+(function () {
+  var NS = "dev:";
+  window.storage = {
+    get: async function (key) {
+      var v = localStorage.getItem(NS + key);
+      return v == null ? null : { key: key, value: v };
+    },
+    set: async function (key, value) {
+      try { localStorage.setItem(NS + key, value); } catch (e) {}
+      return { key: key, value: value };
+    }
+  };
+})();
+</script>
+<script src="js/trainer.build.js"></script>
+</body>
+</html>

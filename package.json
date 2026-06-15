@@ -1,0 +1,17 @@
+{
+  "name": "pyraminx-trainer",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Source + build for the Pyraminx.net V-First / L5E trainer (outputs js/trainer.build.js).",
+  "scripts": {
+    "build:trainer": "node build.mjs",
+    "watch:trainer": "node build.mjs --watch"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "esbuild": "^0.21.5"
+  }
+}
