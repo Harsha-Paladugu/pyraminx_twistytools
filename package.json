@@ -2,7 +2,7 @@
   "name": "pyraminx-trainer",
   "private": true,
   "version": "0.0.0",
-  "description": "Source + build for the Pyraminx.net V-First / L5E trainer (outputs js/trainer.build.js).",
+  "description": "Source + build for the Pyraminx.net V-First / L5E trainer (outputs js/trainer.js).",
   "scripts": {
     "build:trainer": "node build.mjs",
     "watch:trainer": "node build.mjs --watch"

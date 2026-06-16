@@ -1,7 +1,7 @@
-/* Build the trainer bundle from src/trainer into a STAGING artifact.
+/* Build the trainer bundle from src/trainer into the live artifact js/trainer.js.
  *
- * Output: js/trainer.build.js  (NOT js/trainer.js — the live trainer is left
- * untouched until an explicit cutover once this build reaches parity).
+ * The source is now the source of truth for the deployed trainer; trainer.html
+ * loads js/engine.js + js/render.js (shared renderer) then this bundle.
  *
  *   node build.mjs           one-off build
  *   node build.mjs --watch   rebuild on change
@@ -15,7 +15,7 @@ const options = {
   format: 'iife',                 // matches the original bundle (self-executing, no module system)
   target: 'es2018',
   jsx: 'transform',               // classic runtime: source imports React and uses JSX
-  outfile: 'js/trainer.build.js',
+  outfile: 'js/trainer.js',
   banner: { js: '/* Pyraminx.net — V-First trainer (bundled React app). Styles: css/trainer.css */' },
   logLevel: 'info',
 };
@@ -26,5 +26,5 @@ if (process.argv.includes('--watch')) {
   console.log('watching src/trainer for changes…');
 } else {
   await esbuild.build(options);
-  console.log('built js/trainer.build.js');
+  console.log('built js/trainer.js');
 }

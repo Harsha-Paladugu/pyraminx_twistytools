@@ -1,9 +1,8 @@
 # Trainer source
 
-Editable source for the Pyraminx.net trainer. The deployed site serves the
-bundled file `js/trainer.js`; this source builds to a **staging** artifact
-`js/trainer.build.js` so it can be developed and tested without touching the
-live trainer.
+Editable source for the Pyraminx.net trainer — **the source of truth for the
+deployed trainer**. It builds to `js/trainer.js`, which `trainer.html` serves in
+production. Edit here, rebuild, commit the regenerated `js/trainer.js`.
 
 ## Files
 - `l5e-trainer.jsx` — the trainer React component (engine, sheet data, UI).
@@ -13,12 +12,13 @@ live trainer.
 ## Workflow
 ```
 npm install            # once
-npm run build:trainer  # -> js/trainer.build.js
+npm run build:trainer  # -> js/trainer.js
 npm run watch:trainer  # rebuild on change
 ```
-Then open `trainer-dev.html` (e.g. via `python -m http.server 8000`, then
-http://localhost:8000/trainer-dev.html). The dev harness uses an isolated
-`dev:`-prefixed storage key, so testing never touches real trainer progress.
+Test via `trainer-dev.html` (e.g. `python -m http.server 8000`, then
+http://localhost:8000/trainer-dev.html) — it loads the same built `js/trainer.js`
+as the live page but with an isolated `dev:`-prefixed storage key, so testing
+never touches real trainer progress. Then commit the regenerated `js/trainer.js`.
 
 ## Integration contract (must stay true for a drop-in build)
 - Mounts at `#root` (React 18 `createRoot`).
@@ -36,9 +36,8 @@ http://localhost:8000/trainer-dev.html). The dev harness uses an isolated
   `css/trainer.css`.
 
 ## Status
-This source is the **base** the live bundle grew from; the live `js/trainer.js`
-is more complete (it added V-First, Pseudo V, Inspection and TL4E-B). Develop
-features here toward parity, then cut `trainer.html` over to the new build
-(bump its `?v=`). The previous bundle stays in git history for rollback.
-
-`js/trainer.build.js` is generated and git-ignored — rebuild it locally.
+Cut over: `trainer.html` serves the build of this source (`js/trainer.js?v=5`),
+preceded by `js/engine.js` + `js/render.js`. The pre-cutover bundle remains in
+git history for rollback. `js/trainer.js` is a generated artifact but is
+committed (it's what the static site serves); always rebuild it before
+committing source changes.

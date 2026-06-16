@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>L5E Trainer — dev build (staging)</title>
+<title>L5E Trainer — dev harness (isolated storage)</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300..800&family=Instrument+Sans:wght@400;500;600&family=Spline+Sans+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -13,9 +13,9 @@
 <link rel="stylesheet" href="css/trainer.css">
 </head>
 <body>
-<!-- Dev harness for the source build (js/trainer.build.js). Loads the staging
-     artifact, NOT the live js/trainer.js, so this page can run side-by-side
-     with the deployed trainer without affecting it. -->
+<!-- Dev harness: loads the same built js/trainer.js as the live page, but with
+     an isolated (dev:-prefixed) storage bridge so testing never touches real
+     trainer progress. -->
 <script src="js/navbar.js"></script>
 <script>new SiteNavbar({ active: 'trainer' }).mount(document.body);</script>
 <div id="root"></div>
@@ -39,6 +39,6 @@
 <!-- Shared puzzle renderer (same code the rest of the site uses for diagrams). -->
 <script src="js/engine.js"></script>
 <script src="js/render.js"></script>
-<script src="js/trainer.build.js"></script>
+<script src="js/trainer.js"></script>
 </body>
 </html>
