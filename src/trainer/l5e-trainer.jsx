@@ -160,6 +160,19 @@ function parsePseudoOffsets(str) {
   }
   return out.length ? out : null;
 }
+// the six 1-move pseudo offsets, on by default
+const ONE_MOVE_OFFSETS = ["R", "R'", "L", "L'", "B", "B'"].map((s) => ({ str: s, moves: [{ f: s[0], inv: s.length > 1 }] }));
+// effective offsets = (all 1-move pseudos, if enabled) ∪ custom text, deduped.
+// valid when there's at least one and the custom text (if any) parses.
+function effectiveOffsets(pso, pseudoAll) {
+  const raw = String(pso).trim();
+  const custom = raw === "" ? [] : parsePseudoOffsets(pso);
+  if (custom === null) return { list: [], valid: false, badText: true };
+  const seen = new Set(), list = [];
+  for (const o of (pseudoAll ? ONE_MOVE_OFFSETS : []).concat(custom))
+    if (!seen.has(o.str)) { seen.add(o.str); list.push(o); }
+  return { list, valid: list.length > 0, badText: false };
+}
 // apply a plain-move string ("R U' L2") to a state
 function applyMoveString(str, s) {
   const t = copyState(s);
@@ -603,7 +616,7 @@ export default function L5ETrainer() {
   const combinedDistRef = useRef(null);
   const combinedBucketsRef = useRef(null);
   const combinedForRef = useRef(null);   // offsets string the combined table was built for
-  const committedPso = useRef("L, R'");  // offsets the current scramble was generated with
+  const committedPso = useRef("");  // custom-offset text the current scramble was generated with
   const poolsRef = useRef(null);
   const [ready, setReady] = useState(false);
 
@@ -624,7 +637,8 @@ export default function L5ETrainer() {
   const [caseStats, setCaseStats] = useState({});
   const [vfs, setVfs] = useState({});            // Solution Trainer accuracy, keyed by solution length
   const [guessMsg, setGuessMsg] = useState("");  // Solution Trainer: transient "too low" message
-  const [pso, setPso] = useState("L, R'");       // pseudo offsets, shared by Recog + Pseudo V
+  const [pso, setPso] = useState("");            // custom pseudo offsets (text), shared by Pseudo-V + Solution
+  const [pseudoAll, setPseudoAll] = useState(true); // include all six 1-move pseudos
   const [session, setSession] = useState([]);
   const [recap, setRecap] = useState(null);
   const [expandedSet, setExpandedSet] = useState(null);
@@ -663,6 +677,7 @@ export default function L5ETrainer() {
           if (Array.isArray(d.selected)) setSelected(new Set(d.selected.filter((id) => SET_BY_ID[id])));
           if (["drill", "recap", "solution", "recog"].includes(d.mode)) setMode(d.mode);
           if (typeof d.pso === "string") setPso(d.pso);
+          if (typeof d.pseudoAll === "boolean") setPseudoAll(d.pseudoAll);
           if (Array.isArray(d.vlen)) setVlenSel(new Set(d.vlen.filter((n) => n >= 1 && n <= 7)));
           if (Array.isArray(d.goals)) { const g = d.goals.filter((x) => GOAL_TYPES.some((t) => t.id === x)); if (g.length) setGoals(new Set(g)); }
           if (Array.isArray(d.caseSel)) setCaseSel(new Set(d.caseSel.filter((k) => typeof k === "string" && SET_BY_ID[k.split(CASE_SEP)[0]])));
@@ -709,10 +724,10 @@ export default function L5ETrainer() {
     clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
       try {
-        window.storage.set(STORE_KEY, JSON.stringify({ caseStats, l5eBars: [...l5eBars], l4eSlots: [...l4eSlots], selected: [...selected], mode, vlen: [...vlenSel], goals: [...goals], caseSel: [...caseSel], caseKnown: [...caseKnown], scope, setupOpen, vfs, pso })).catch(() => {});
+        window.storage.set(STORE_KEY, JSON.stringify({ caseStats, l5eBars: [...l5eBars], l4eSlots: [...l4eSlots], selected: [...selected], mode, vlen: [...vlenSel], goals: [...goals], caseSel: [...caseSel], caseKnown: [...caseKnown], scope, setupOpen, vfs, pso, pseudoAll })).catch(() => {});
       } catch (e) {}
     }, 400);
-  }, [caseStats, l5eBars, l4eSlots, selected, mode, vlenSel, goals, caseSel, caseKnown, scope, setupOpen, vfs, pso]);
+  }, [caseStats, l5eBars, l4eSlots, selected, mode, vlenSel, goals, caseSel, caseKnown, scope, setupOpen, vfs, pso, pseudoAll]);
 
   const makeScramble = useCallback((setId, caseKey, presArr, angle) => {
     // present the case at the given angle (bar for L5E, open slot for L4E); both
@@ -925,16 +940,18 @@ export default function L5ETrainer() {
   // when the offsets change (the pseudo-V part depends on them).
   const ensureSolution = useCallback(() => {
     if (!vdistRef.current || !tl4eDistRef.current) return;
-    const offs = goals.has("pv") ? parsePseudoOffsets(pso) : null;
-    const key = goalsKeyOf(goals) + "|" + (offs ? pso : "");
+    const eff = goals.has("pv") ? effectiveOffsets(pso, pseudoAll) : null;
+    const offs = eff && eff.valid ? eff.list : null;
+    const offKey = offs ? offs.map((o) => o.str).join(",") : "";
+    const key = goalsKeyOf(goals) + "|" + offKey;
     if (combinedForRef.current === key && combinedDistRef.current) return;
     const tables = [];
     if (goals.has("v")) tables.push(vdistRef.current);
     if (goals.has("tl4e")) tables.push(tl4eDistRef.current);
     if (offs) {
-      if (pseudoVForRef.current !== pso || !pseudoVdistRef.current) {
+      if (pseudoVForRef.current !== offKey || !pseudoVdistRef.current) {
         pseudoVdistRef.current = buildPseudoVDist(vbucketsRef.current[0], offs, distRef.current);
-        pseudoVForRef.current = pso;
+        pseudoVForRef.current = offKey;
       }
       tables.push(pseudoVdistRef.current);
     }
@@ -942,7 +959,7 @@ export default function L5ETrainer() {
     if (!tables.length) { combinedDistRef.current = null; combinedBucketsRef.current = null; return; }
     combinedDistRef.current = combineDists(tables);
     combinedBucketsRef.current = buildVBuckets(distRef.current, combinedDistRef.current);
-  }, [pso, goals]);
+  }, [pso, pseudoAll, goals]);
 
   const nextSolution = useCallback(() => {
     setPhase("ready"); setLast(null); setGuessMsg("");
@@ -979,16 +996,18 @@ export default function L5ETrainer() {
   // offset move returns to the clean case at the SAME AUF. We then mask the
   // scramble (so it doesn't telegraph the offset) while pinning its net U to
   // the case AUF, so the pseudo and the revealed case line up on screen.
-  const makeRecog = useCallback((psoStr) => {
-    const offs = parsePseudoOffsets(psoStr);
+  const makeRecog = useCallback((offs) => {
     const pool = poolsRef.current && poolsRef.current["l4e-DF"];
-    if (!offs || !pool || !pool.states.length) return null;
+    if (!offs || !offs.length || !pool || !pool.states.length) return null;
     for (let attempt = 0; attempt < 25; attempt++) {
       const pres = pool.states[Math.floor(Math.random() * pool.states.length)];
       const base = makeScramble("l4e", pres.caseKey, pool.classes.get(pres.caseKey), "DF");
       if (!base || !base.scramble) continue;
       const off = offs[Math.floor(Math.random() * offs.length)];
-      const render = applyMoveString(off.str, base.render);   // pseudo = case . offset
+      // pseudo: the offset is the LAST move (after the L4E alg). So the state is
+      // the L4E scramble applied on top of O^-1 — do the alg to reach O^-1, then O.
+      const W = applyMoveString(invertOffsetTokens(off), solvedState());
+      const render = applyMoveString(base.scramble, W);
       let scramble = null;
       for (let k = 0; k < 16; k++) {
         const s = maskedScramble(render, distRef.current);
@@ -1005,8 +1024,8 @@ export default function L5ETrainer() {
   const nextRecog = useCallback(() => {
     committedPso.current = pso;
     setPhase("ready"); setLast(null);
-    setCurrent(makeRecog(pso));
-  }, [makeRecog, pso]);
+    setCurrent(makeRecog(effectiveOffsets(pso, pseudoAll).list));
+  }, [makeRecog, pso, pseudoAll]);
 
   const revealRecog = useCallback(() => {
     if (!current || current.kind !== "recog") return;
@@ -1045,7 +1064,7 @@ export default function L5ETrainer() {
     else if (mode === "drill") nextDrill();
     else startRecap();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, l5eBars, l4eSlots, selected, mode, vlenSel, goals, caseSel, caseKnown, scope]);
+  }, [ready, l5eBars, l4eSlots, selected, mode, vlenSel, goals, caseSel, caseKnown, scope, pseudoAll]);
 
   const tick = useCallback(() => {
     setElapsed(performance.now() - t0.current);
@@ -1179,7 +1198,7 @@ export default function L5ETrainer() {
     setVfs({});
     setSession([]);
     setLast(null);
-    try { window.storage.set(STORE_KEY, JSON.stringify({ caseStats: {}, l5eBars: [...l5eBars], l4eSlots: [...l4eSlots], selected: [...selected], mode, vlen: [...vlenSel], goals: [...goals], caseSel: [...caseSel], caseKnown: [...caseKnown], scope, setupOpen, vfs: {}, pso })).catch(() => {}); } catch (e) {}
+    try { window.storage.set(STORE_KEY, JSON.stringify({ caseStats: {}, l5eBars: [...l5eBars], l4eSlots: [...l4eSlots], selected: [...selected], mode, vlen: [...vlenSel], goals: [...goals], caseSel: [...caseSel], caseKnown: [...caseKnown], scope, setupOpen, vfs: {}, pso, pseudoAll })).catch(() => {}); } catch (e) {}
   };
 
   useEffect(() => { if (mode === "drill" || mode === "recap") lastAlgoMode.current = mode; }, [mode]);
@@ -1309,20 +1328,26 @@ export default function L5ETrainer() {
           </div>
         )}
 
-        {(mode === "recog" || (mode === "solution" && goals.has("pv"))) && (
-          <div className="chips" style={{ alignItems: "center" }}>
-            <span className="grouplabel">offsets</span>
-            <input className="offsetin mono" value={pso}
-              onChange={(e) => setPso(e.target.value)}
-              onBlur={commitOffsets}
-              onKeyDown={(e) => { if (e.code === "Enter" || e.code === "NumpadEnter") { e.preventDefault(); e.target.blur(); } }}
-              placeholder="e.g. L, R', L R'" aria-label="pseudo offsets" />
-            {mode === "solution" ? (!parsePseudoOffsets(pso)
-                ? <span className="offsetbad">enter valid offsets (plain moves, ≤4 each)</span>
-                : <span className="offsetbad" style={{ color: "var(--faint)" }}>pseudo V offsets</span>)
-              : !parsePseudoOffsets(pso) ? <span className="offsetbad">enter valid offsets (plain moves, ≤4 each)</span> : null}
-          </div>
-        )}
+        {(mode === "recog" || (mode === "solution" && goals.has("pv"))) && (() => {
+          const eff = effectiveOffsets(pso, pseudoAll);
+          return (
+            <div className="chips" style={{ alignItems: "center" }}>
+              <span className="grouplabel">pseudos</span>
+              <button className={"chip" + (pseudoAll ? " on" : "")} style={{ "--cdot": "var(--accent)" }}
+                onClick={() => setPseudoAll((v) => !v)} title="R R' L L' B B'">
+                <span className="dot" />all 1-move
+              </button>
+              <input className="offsetin mono" value={pso}
+                onChange={(e) => setPso(e.target.value)}
+                onBlur={commitOffsets}
+                onKeyDown={(e) => { if (e.code === "Enter" || e.code === "NumpadEnter") { e.preventDefault(); e.target.blur(); } }}
+                placeholder="add more — e.g. L R', R U" aria-label="extra pseudo offsets" />
+              {eff.badText ? <span className="offsetbad">invalid offset (plain moves, ≤4 each)</span>
+                : !eff.valid ? <span className="offsetbad">enable 1-move pseudos or add an offset</span>
+                : <span className="offsetbad" style={{ color: "var(--faint)" }}>{eff.list.length} offset{eff.list.length === 1 ? "" : "s"}</span>}
+            </div>
+          );
+        })()}
 
         {mode === "solution" && (
           <>
@@ -1364,10 +1389,10 @@ export default function L5ETrainer() {
             <div className="empty" style={{ padding: "40px 0", textAlign: "center" }}>
               {mode === "solution" ? (
                   goals.size === 0 ? "Select at least one goal type (V, Pseudo V, TL4E-B) to start."
-                  : (goals.size === 1 && goals.has("pv") && !parsePseudoOffsets(pso)) ? "Enter at least one valid offset above to start."
+                  : (goals.size === 1 && goals.has("pv") && !effectiveOffsets(pso, pseudoAll).valid) ? "Pick a pseudo offset above to start (enable 1-move pseudos or add one)."
                   : vlenSel.size === 0 ? "Select at least one length to start."
                   : "No solutions at the selected lengths for these goals — pick other lengths.")
-                : mode === "recog" ? "Enter at least one valid offset above to start."
+                : mode === "recog" ? "Pick a pseudo offset above to start (enable 1-move pseudos or add one)."
                 : selected.size === 0 ? "Select at least one set to start."
                 : ([...selected].some((id) => SET_BY_ID[id].group === "L5E") && l5eBars.size === 0 && !(selected.has("l4e") && l4eSlots.size > 0)) ? "Select at least one bar to start."
                 : (selected.has("l4e") && l4eSlots.size === 0 && !([...selected].some((id) => SET_BY_ID[id].group === "L5E") && l5eBars.size > 0)) ? "Select at least one slot to start."
@@ -1385,13 +1410,13 @@ export default function L5ETrainer() {
             {phase === "stopped" && last ? (
               <>
                 <div className="reveal">
-                  <span>pseudo offset</span>
+                  <span>finish with</span>
                   <span className="tag" style={{ "--cdot": "var(--accent)" }}><span className="dot" />{last.offsetStr}</span>
                   <span className="casename">{SHEET.CNAME[last.caseKey] || "unnamed case"}</span>
                   <button className="algbtn" onClick={() => setPanel({ kind: "class", caseKey: last.caseKey, set: "l4e" })}>view algs</button>
                   <button className="restart" style={{ marginTop: 0 }} onClick={nextRecog}>Next</button>
                 </div>
-                <div className="solhead">underlying L4E case — {last.offsetStr} undone (same AUF)</div>
+                <div className="solhead">solve this L4E case, then do {last.offsetStr}</div>
                 <div className="panelimg"><PyraminxNet state={last.caseRender} uTwist={last.caseTwist} /></div>
               </>
             ) : (
