@@ -616,6 +616,8 @@ export default function L5ETrainer() {
   const [expandedSet, setExpandedSet] = useState(null);
   const [panel, setPanel] = useState(null);
   const [caseSel, setCaseSel] = useState(() => new Set()); // DISABLED cases "setId|caseKey" (default: all enabled)
+  const [caseKnown, setCaseKnown] = useState(() => new Set()); // KNOWN cases (same keying); default: all unknown
+  const [scope, setScope] = useState("all");               // practice scope: "all" | "learning" | "known"
   const [caseBrowser, setCaseBrowser] = useState(null);    // which set's case list is open in the picker
 
   const t0 = useRef(0);
@@ -647,6 +649,8 @@ export default function L5ETrainer() {
           if (Array.isArray(d.vlen)) setVlenSel(new Set(d.vlen.filter((n) => n >= 1 && n <= 7)));
           if (Array.isArray(d.goals)) { const g = d.goals.filter((x) => GOAL_TYPES.some((t) => t.id === x)); if (g.length) setGoals(new Set(g)); }
           if (Array.isArray(d.caseSel)) setCaseSel(new Set(d.caseSel.filter((k) => typeof k === "string" && SET_BY_ID[k.split(CASE_SEP)[0]])));
+          if (Array.isArray(d.caseKnown)) setCaseKnown(new Set(d.caseKnown.filter((k) => typeof k === "string" && SET_BY_ID[k.split(CASE_SEP)[0]])));
+          if (["all", "learning", "known"].includes(d.scope)) setScope(d.scope);
           if (d.vfs && typeof d.vfs === "object") {
             const v = {};
             for (const [k, st] of Object.entries(d.vfs)) if (/^[1-7]$/.test(k)) v[k] = st;
@@ -675,10 +679,10 @@ export default function L5ETrainer() {
     clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
       try {
-        window.storage.set(STORE_KEY, JSON.stringify({ caseStats, l5eBars: [...l5eBars], l4eSlots: [...l4eSlots], selected: [...selected], mode, vlen: [...vlenSel], goals: [...goals], caseSel: [...caseSel], vfs, pso })).catch(() => {});
+        window.storage.set(STORE_KEY, JSON.stringify({ caseStats, l5eBars: [...l5eBars], l4eSlots: [...l4eSlots], selected: [...selected], mode, vlen: [...vlenSel], goals: [...goals], caseSel: [...caseSel], caseKnown: [...caseKnown], scope, vfs, pso })).catch(() => {});
       } catch (e) {}
     }, 400);
-  }, [caseStats, l5eBars, l4eSlots, selected, mode, vlenSel, goals, caseSel, vfs, pso]);
+  }, [caseStats, l5eBars, l4eSlots, selected, mode, vlenSel, goals, caseSel, caseKnown, scope, vfs, pso]);
 
   const makeScramble = useCallback((setId, caseKey, presArr) => {
     // present the case at a randomly chosen selected angle (bar for L5E, open
@@ -748,6 +752,29 @@ export default function L5ETrainer() {
     return all.length - all.filter(({ name }) => caseSel.has(nmId(setId, name))).length;
   }, [casesOf, caseSel]);
 
+  // Per-case "known" status (manual). Mirrors caseSel; caseKnown holds KNOWN
+  // names, so a case is unknown unless explicitly marked.
+  const caseIsKnown = (setId, name) => caseKnown.has(nmId(setId, name));
+  const toggleKnown = (setId, name) => {
+    setCaseKnown((s) => { const n = new Set(s); const k = nmId(setId, name); if (n.has(k)) n.delete(k); else n.add(k); return n; });
+  };
+  const setAllKnown = (setId, known) => {
+    setCaseKnown((s) => {
+      const n = new Set(s);
+      for (const { name } of casesOf(setId)) { const k = nmId(setId, name); if (known) n.add(k); else n.delete(k); }
+      return n;
+    });
+  };
+  const knownCount = useCallback((setId) =>
+    casesOf(setId).filter(({ name }) => caseKnown.has(nmId(setId, name))).length, [casesOf, caseKnown]);
+  // identity of the just-solved drill/recap case (last, not current — stopTimer
+  // already advanced current). null for recog/solution (no named-case identity).
+  const lastKnownId = () => {
+    if (!last || last.kind || !last.set) return null;
+    const name = SHEET.CNAME[last.caseKey] || last.caseKey;
+    return { setId: last.set, name, key: nmId(last.set, name) };
+  };
+
   const nextDrill = useCallback(() => {
     // enabled classes only, weighted by how many physical states each holds
     const entries = [];
@@ -758,6 +785,9 @@ export default function L5ETrainer() {
         const name = SHEET.CNAME[ck] || ck;
         if (id === "l4e" && /^ML4E/.test(name)) continue;
         if (caseSel.has(id + CASE_SEP + name)) continue;
+        const kn = caseKnown.has(id + CASE_SEP + name);
+        if (scope === "learning" && kn) continue;
+        if (scope === "known" && !kn) continue;
         entries.push({ id, ck, sts });
       }
     }
@@ -768,7 +798,7 @@ export default function L5ETrainer() {
       if (r < e.sts.length) { setCurrent(makeScramble(e.id, e.ck, e.sts)); return; }
       r -= e.sts.length;
     }
-  }, [selected, caseSel, l4eSlots, l5eBars, makeScramble, poolOf]);
+  }, [selected, caseSel, caseKnown, scope, l4eSlots, l5eBars, makeScramble, poolOf]);
 
   const startRecap = useCallback(() => {
     // one entry per enabled named case (a representative state), so recap walks
@@ -777,7 +807,13 @@ export default function L5ETrainer() {
     for (const id of [...selected]) {
       if (!poolOf(id)) continue;
       if ((id === "l4e" ? l4eSlots : l5eBars).size === 0) continue; // no presentation angle picked
-      for (const { name, keys } of casesOf(id)) { if (caseSel.has(id + CASE_SEP + name)) continue; q.push({ set: id, caseKey: keys[0] }); }
+      for (const { name, keys } of casesOf(id)) {
+        if (caseSel.has(id + CASE_SEP + name)) continue;
+        const kn = caseKnown.has(id + CASE_SEP + name);
+        if (scope === "learning" && kn) continue;
+        if (scope === "known" && !kn) continue;
+        q.push({ set: id, caseKey: keys[0] });
+      }
     }
     const queue = shuffled(q);
     setRecap({ queue, idx: 0 });
@@ -785,7 +821,7 @@ export default function L5ETrainer() {
       const it = queue[0];
       setCurrent(makeScramble(it.set, it.caseKey, poolOf(it.set).classes.get(it.caseKey)));
     } else setCurrent(null);
-  }, [selected, caseSel, l4eSlots, l5eBars, casesOf, makeScramble, poolOf]);
+  }, [selected, caseSel, caseKnown, scope, l4eSlots, l5eBars, casesOf, makeScramble, poolOf]);
 
   // Solution Trainer: every optimal solution (all shortest descents of vdist to a V)
   const allOptimalVs = useCallback((s, vdist) => {
@@ -948,7 +984,7 @@ export default function L5ETrainer() {
     else if (mode === "drill") nextDrill();
     else startRecap();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, l5eBars, l4eSlots, selected, mode, vlenSel, goals, caseSel]);
+  }, [ready, l5eBars, l4eSlots, selected, mode, vlenSel, goals, caseSel, caseKnown, scope]);
 
   const tick = useCallback(() => {
     setElapsed(performance.now() - t0.current);
@@ -1008,12 +1044,20 @@ export default function L5ETrainer() {
         if (m) { e.preventDefault(); submitGuess(+m[1]); }
         return;
       }
+      if (phase === "stopped" && e.code === "KeyK") {  // mark the just-solved case known/unknown
+        e.preventDefault();
+        if (last && !last.kind && last.set) {
+          const nm = last.set + CASE_SEP + (SHEET.CNAME[last.caseKey] || last.caseKey);
+          setCaseKnown((s) => { const n = new Set(s); if (n.has(nm)) n.delete(nm); else n.add(nm); return n; });
+        }
+        return;
+      }
       if (phase === "running") { e.preventDefault(); stopTimer(); return; }
       if (e.code === "Space") { e.preventDefault(); trigger(); }
     };
     window.addEventListener("keydown", down);
     return () => window.removeEventListener("keydown", down);
-  }, [phase, trigger, stopTimer, panel, mode, submitGuess, nextSolution, nextRecog, revealRecog]);
+  }, [phase, trigger, stopTimer, panel, mode, submitGuess, nextSolution, nextRecog, revealRecog, last]);
 
   useEffect(() => () => cancelAnimationFrame(raf.current), []);
 
@@ -1066,7 +1110,7 @@ export default function L5ETrainer() {
     setVfs({});
     setSession([]);
     setLast(null);
-    try { window.storage.set(STORE_KEY, JSON.stringify({ caseStats: {}, l5eBars: [...l5eBars], l4eSlots: [...l4eSlots], selected: [...selected], mode, vlen: [...vlenSel], goals: [...goals], caseSel: [...caseSel], vfs: {}, pso })).catch(() => {}); } catch (e) {}
+    try { window.storage.set(STORE_KEY, JSON.stringify({ caseStats: {}, l5eBars: [...l5eBars], l4eSlots: [...l4eSlots], selected: [...selected], mode, vlen: [...vlenSel], goals: [...goals], caseSel: [...caseSel], caseKnown: [...caseKnown], scope, vfs: {}, pso })).catch(() => {}); } catch (e) {}
   };
 
   return (
@@ -1138,20 +1182,34 @@ export default function L5ETrainer() {
                     <span className="dot" style={{ background: s.color }} />
                     {s.name} cases
                     <span className="ct">{enabledCount(s.id)}/{cases.length}</span>
+                    <span className="ct" style={{ color: "var(--green)" }}>{knownCount(s.id)} known</span>
                   </button>
                   {open && (
                     <div className="caselistwrap">
                       <div className="presets" style={{ margin: "0 2px 8px" }}>
                         <button className="preset" onClick={() => setAllCases(s.id, true)}>all</button>
                         <button className="preset" onClick={() => setAllCases(s.id, false)}>none</button>
+                        <button className="preset" onClick={() => setAllKnown(s.id, true)}>mark all known</button>
+                        <button className="preset" onClick={() => setAllKnown(s.id, false)}>mark all unknown</button>
                       </div>
                       <div className="chips">
-                        {cases.map(({ name }) => (
-                          <button key={name} className={"chip" + (caseEnabled(s.id, name) ? " on" : "")}
-                            style={{ "--cdot": s.color }} onClick={() => toggleCase(s.id, name)}>
-                            <span className="dot" />{name}
-                          </button>
-                        ))}
+                        {cases.map(({ name }) => {
+                          const kn = caseIsKnown(s.id, name);
+                          return (
+                            <span key={name} className="markwrap">
+                              <button className={"chip" + (caseEnabled(s.id, name) ? " on" : "")}
+                                style={{ "--cdot": s.color }} onClick={() => toggleCase(s.id, name)}>
+                                <span className="dot" />{name}{kn ? " ✓" : ""}
+                              </button>
+                              <button className={"markbtn ok" + (kn ? " sel" : "")} title="mark known"
+                                onClick={() => toggleKnown(s.id, name)}>K</button>
+                            </span>
+                          );
+                        })}
+                      </div>
+                      <div className="recapbar" style={{ margin: "8px 2px 0" }}>
+                        <span className="mono">{knownCount(s.id)}/{cases.length} known</span>
+                        <div className="rtrack"><div className="rfill" style={{ width: `${cases.length ? (knownCount(s.id) / cases.length) * 100 : 0}%` }} /></div>
                       </div>
                     </div>
                   )}
@@ -1167,6 +1225,17 @@ export default function L5ETrainer() {
           <button className={"mode" + (mode === "solution" ? " on" : "")} onClick={() => setMode("solution")}>Solution</button>
           <button className={"mode" + (mode === "recog" ? " on" : "")} onClick={() => setMode("recog")}>Recog</button>
         </div>
+
+        {(mode === "drill" || mode === "recap") && (
+          <div className="chips" style={{ alignItems: "center" }}>
+            <span className="grouplabel" style={{ marginLeft: 0 }}>practice</span>
+            <div className="modes" style={{ marginBottom: 0 }}>
+              {[["all", "All"], ["learning", "Learning"], ["known", "Known"]].map(([v, l]) => (
+                <button key={v} className={"mode" + (scope === v ? " on" : "")} onClick={() => setScope(v)}>{l}</button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {mode === "solution" && (
           <div className="chips">
@@ -1242,6 +1311,8 @@ export default function L5ETrainer() {
                 : selected.size === 0 ? "Select at least one set to start."
                 : ([...selected].some((id) => SET_BY_ID[id].group === "L5E") && l5eBars.size === 0 && !(selected.has("l4e") && l4eSlots.size > 0)) ? "Select at least one bar to start."
                 : (selected.has("l4e") && l4eSlots.size === 0 && !([...selected].some((id) => SET_BY_ID[id].group === "L5E") && l5eBars.size > 0)) ? "Select at least one slot to start."
+                : scope === "learning" ? "Nothing left to learn here — every enabled case is marked known. Switch practice to All or Known, or unmark some cases."
+                : scope === "known" ? "No cases marked known yet in this selection — mark some known, or switch practice to All."
                 : "Enable at least one case to start."}
             </div>
           </div>
@@ -1326,6 +1397,18 @@ export default function L5ETrainer() {
                   onClick={(e) => { e.stopPropagation(); setPanel({ kind: "live", ...last }); }}>
                   view algs
                 </button>
+                {(() => {
+                  const k = lastKnownId();
+                  if (!k) return null;
+                  const isK = caseKnown.has(k.key);
+                  return (
+                    <button className={"markbtn ok" + (isK ? " sel" : "")} title="mark known (K)"
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onClick={(e) => { e.stopPropagation(); toggleKnown(k.setId, k.name); }}>
+                      {isK ? "Known ✓" : "Mark known"}
+                    </button>
+                  );
+                })()}
               </div>
             ) : (
               <div className="hint">{phase === "running" ? "tap or any key to stop" : "tap or space to start"}</div>
@@ -1371,7 +1454,7 @@ export default function L5ETrainer() {
                   <div className="empty">No solves yet. Times land here, grouped by set.</div>
                 ) : (
                   <table>
-                    <thead><tr><th>Set</th><th>Solves</th><th>Cases seen</th><th>Best</th><th>Mean</th></tr></thead>
+                    <thead><tr><th>Set</th><th>Solves</th><th>Cases seen</th><th>Known</th><th>Best</th><th>Mean</th></tr></thead>
                     <tbody>
                       {SETS.filter((s) => setAgg[s.id]).map((s) => {
                         const a = setAgg[s.id];
@@ -1383,6 +1466,7 @@ export default function L5ETrainer() {
                             </td>
                             <td className="mono">{a.n}</td>
                             <td className="mono">{a.cases}{counts[s.id] ? ` / ${counts[s.id]}` : ""}</td>
+                            <td className="mono">{knownCount(s.id)}{counts[s.id] ? ` / ${counts[s.id]}` : ""}</td>
                             <td className="mono">{fmt(a.best)}</td>
                             <td className="mono">{fmt(a.sum / a.n)}</td>
                           </tr>

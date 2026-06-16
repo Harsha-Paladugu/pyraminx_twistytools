@@ -136,7 +136,8 @@ td .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; ma
   padding: .45em .9em; cursor: pointer; font-family: inherit; font-size: 12.5px; }
 .danger:hover { background: rgba(232,71,61,.12); }
 .resetwarn { color: var(--red); font-size: 13px; font-weight: 500; }
-.markwrap { display: inline-flex; gap: 6px; }
+.markwrap { display: inline-flex; gap: 4px; align-items: center; }
+.markwrap .markbtn { padding: 3px 8px; font-size: 11px; } /* compact "K" toggle next to a case chip */
 .markbtn { background: transparent; border: 1px solid var(--line2); color: var(--mut); border-radius: 999px;
   padding: 4px 12px; cursor: pointer; font-family: inherit; font-size: 12.5px; }
 .markbtn:hover { color: var(--txt); border-color: var(--mut); }
