@@ -1074,11 +1074,7 @@ export default function L5ETrainer() {
       <div className="frame">
         <header>
           <div className="brandrow">
-            <svg className="logo" viewBox="0 0 40 36" aria-hidden="true">
-              <polygon points="20,2 2,34 38,34" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinejoin="round" />
-              <polygon points="20,14.8 11,30.4 29,30.4" fill="var(--accent)" stroke="none" />
-            </svg>
-            <div className="brand">L5E <span>Trainer</span></div>
+            <div className="brand">V-First <span>Trainer</span></div>
           </div>
           <div className="spacer" />
           <button className="gear" onClick={() => setSettingsOpen((o) => !o)}>Settings</button>
