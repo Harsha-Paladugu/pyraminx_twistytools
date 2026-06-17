@@ -149,29 +149,6 @@ function makeSolverCore(E, dist) {
     const capMax = Math.max(0, ...ids.map(id => cfg.caps[id]));
     return { sets, ids, capMax };
   }
-  // distance-to-nearest-enabled-target over the no-u space (lower bound for pruning)
-  function buildTv(targets, tick) {
-    const tv = new Int8Array(NOU).fill(-1);
-    let frontier = [];
-    for (const id of targets.ids) for (const sig of targets.sets[id]) if (tv[sig] === -1) { tv[sig] = 0; frontier.push(sig); }
-    let d = 0;
-    const stepAll = (s) => { const out = []; for (let m = 0; m < 8; m++) { const t = E.copy(s); E.applyMoveIdx(t, m); out.push(t); } return out; };
-    while (frontier.length) {
-      const next = [];
-      for (const sg of frontier) {
-        const s = E.unidx(sg * 3);
-        for (let m = 0; m < 8; m++) {
-          const t = E.copy(s); E.applyMoveIdx(t, m);
-          const ts = sigOf(t);
-          if (tv[ts] === -1) { tv[ts] = d + 1; next.push(ts); }
-        }
-      }
-      d++;
-      frontier = next;
-      if (tick) tick(d);
-    }
-    return tv;
-  }
 
   /* ---------- rotation prefixes ---------- */
   // For each of the 12 rotations: a token string (<=2 rotation tokens) and the transformed
@@ -328,7 +305,6 @@ function makeSolverCore(E, dist) {
       offsets: (opts.offsets || []),
     };
     const targets = buildTargets(cfg);
-    const tv = opts.tv; // caller supplies (cached) or null
     const rot = opts.rotations; // from buildRotations()
     const slack = opts.slack ?? 0;
     const maxCancel = opts.maxCancel ?? 2;
@@ -364,7 +340,6 @@ function makeSolverCore(E, dist) {
           // allow slack margin:
           if (seq.length + df > Lmax + maxCancel + slack) return;
         }
-        if (tv && seq.length + tv[sg] > targets.capMax) return;
         for (let m = 0; m < 8; m++) {
           if ((m >> 1) === lastCorner) continue;
           const t = E.copy(s); E.applyMoveIdx(t, m);
@@ -441,9 +416,7 @@ function makeSolverCore(E, dist) {
     return { byLength, dopt, truncated, work };
   }
 
-  return { reduceSeq, pool, compose, invPremoveState, parseOffset, buildTargets, buildTv, buildRotations, ergoScore, search, METHOD_DEFS, ERGO_DEFAULTS, sigOf };
+  return { reduceSeq, pool, compose, invPremoveState, parseOffset, buildTargets, buildRotations, ergoScore, search, METHOD_DEFS, ERGO_DEFAULTS, sigOf };
 }
 if (typeof module !== 'undefined') module.exports = { makeSolverCore };
-else window.OOSolverCore = { makeSolverCore };
-
 window.OOSolverCore=module.exports;})();

@@ -173,7 +173,7 @@ async function runSearch(newLengths) {
     const res = C.search(UI.state, {
       methods: UI.methods, caps: UI.caps, offsets,
       slack: UI.slack, maxCancel: UI.maxCancel,
-      lengths, rotations, tv: null,
+      lengths, rotations,
       budget: Math.max(...lengths) >= 10 ? 2.5e7 : 8e6,
       weights: UI.weights,
     });

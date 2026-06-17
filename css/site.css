@@ -106,7 +106,6 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{
 .symthumb{background:var(--ink2);border:1px solid var(--line);border-radius:9px;padding:4px;line-height:0}
 .symthumb:hover{border-color:var(--mut)}
 .symthumb.on{border-color:var(--yellow)}
-.symdetail{display:flex;align-items:center;gap:10px;flex-wrap:wrap;min-height:1.6em;margin-top:8px}
 /* solutions */
 .solcard{margin-bottom:16px}
 .solrow{display:grid;grid-template-columns:1fr 1fr auto;gap:14px;align-items:center;padding:12px 0;border-top:1px solid var(--line)}
