@@ -31,24 +31,8 @@
   const adminEmails = (CFG.adminEmails || []).map(e => e.toLowerCase());
   const app = document.getElementById('app');
 
-  // ---------- tiny hyperscript ----------
-  function h(tag, attrs) {
-    const n = document.createElement(tag);
-    for (const k in (attrs || {})) {
-      if (k === 'class') n.className = attrs[k];
-      else if (k === 'html') n.innerHTML = attrs[k];
-      else if (k.slice(0, 2) === 'on' && typeof attrs[k] === 'function') n.addEventListener(k.slice(2), attrs[k]);
-      else if (attrs[k] !== null && attrs[k] !== undefined && attrs[k] !== false) n.setAttribute(k, attrs[k]);
-    }
-    for (let i = 2; i < arguments.length; i++) {
-      const kids = arguments[i];
-      (Array.isArray(kids) ? kids : [kids]).forEach(kid => {
-        if (kid === null || kid === undefined || kid === false) return;
-        n.appendChild(typeof kid === 'string' || typeof kid === 'number' ? document.createTextNode(String(kid)) : kid);
-      });
-    }
-    return n;
-  }
+  // ---------- tiny hyperscript (shared, js/dom.js) ----------
+  const { h } = window.OODom;
 
   // ---------- engine keying / canonicalization (single source: js/engine.js) ----------
   const { stateKey, realCanonKey, caseStateOf, applyMoveK, openOfEkey, barOfEkey } = E;
@@ -94,7 +78,7 @@
   // the case — so an alg that solves the case's edges counts, whatever AUF it
   // finishes on.
   function aufAmount(from, to) {
-    const s = { e: from.e.slice(), c: [0, 0, 0] };
+    const s = { e: from.e.slice() };   // edges only — stateKey/applyMoveK('U') never touch .c
     const tk = stateKey(to);
     for (let p = 0; p < 3; p++) {
       if (stateKey(s) === tk) return p;
@@ -280,7 +264,15 @@
     },
     async save(subsetKey, caseName) {
       const ov = overrides.get(caseId(subsetKey, caseName)) || { added: [], removed: new Set(), order: [] };
-      let m = {}; try { m = JSON.parse(localStorage.getItem(DRAFT_KEY)) || {}; } catch (e) {}
+      let m = {};
+      try { m = JSON.parse(localStorage.getItem(DRAFT_KEY)) || {}; }
+      catch (e) {
+        // Mirror loadAll: don't silently overwrite an unreadable draft — set it aside and warn.
+        const raw = localStorage.getItem(DRAFT_KEY);
+        console.error('algs: unreadable draft on save, set aside as ' + DRAFT_KEY + '.bad', e);
+        try { localStorage.setItem(DRAFT_KEY + '.bad', raw); } catch (_) {}
+        draftError = 'Your saved draft was unreadable and has been set aside (' + DRAFT_KEY + '.bad). Continuing from your current edits.';
+      }
       m[caseId(subsetKey, caseName)] = { subset: subsetKey, case: caseName, added: ov.added, removed: [...ov.removed], order: ov.order || [] };
       try { localStorage.setItem(DRAFT_KEY, JSON.stringify(m)); draftError = ''; return true; }
       catch (e) {
@@ -440,12 +432,18 @@
   function adminAdder(targets, card, rerender) {
     const input = h('input', { class: 'mono addin', type: 'text', placeholder: 'Add an algorithm — auto-checked', spellcheck: 'false' });
     const fb = h('span', { class: 'addfb' });
-    const check = (alg) => { for (const t of targets) { const v = validate(t.subKey, t.c, alg); if (v.ok) return { t, side: v.side }; } return null; };
+    // returns { t, side } on the first target the alg solves, else { reason }
+    // carrying validate()'s specific diagnostic (so the UI shows WHY it failed).
+    const check = (alg) => {
+      let reason = 'Not a valid algorithm, or it doesn’t solve this case.';
+      for (const t of targets) { const v = validate(t.subKey, t.c, alg); if (v.ok) return { t, side: v.side }; reason = v.reason; }
+      return { reason };
+    };
     const submit = async () => {
       const alg = input.value.trim().replace(/\s+/g, ' ');
       if (!alg) return;
       const hit = check(alg);
-      if (!hit) { fb.className = 'addfb err'; fb.textContent = 'Not a valid algorithm, or it doesn’t solve this case.'; return; }
+      if (!hit.t) { fb.className = 'addfb err'; fb.textContent = hit.reason; return; }
       input.value = ''; fb.className = 'addfb'; fb.textContent = '';
       await addAlg(hit.t.subKey, hit.t.c, alg, hit.side);
       rerender();
@@ -454,8 +452,8 @@
       const alg = input.value.trim();
       if (!alg) { fb.className = 'addfb'; fb.textContent = ''; return; }
       const hit = check(alg);
-      fb.className = 'addfb ' + (hit ? 'ok' : 'err');
-      fb.textContent = hit ? '✓ ' + sideLabel(hit.t.subKey, hit.side).toLowerCase() : 'Doesn’t solve this case.';
+      fb.className = 'addfb ' + (hit.t ? 'ok' : 'err');
+      fb.textContent = hit.t ? '✓ ' + sideLabel(hit.t.subKey, hit.side).toLowerCase() : hit.reason;
     });
     input.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
     return h('div', { class: 'adder' }, input, h('button', { class: 'primary sm', onclick: submit }, 'Add'), fb);

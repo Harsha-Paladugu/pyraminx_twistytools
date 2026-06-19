@@ -2,26 +2,7 @@
 /* Pyraminx OO — Solver tab app. Expects OOEngine, OORender, OOSolverCore. */
 (function () {
 const E = window.OOEngine, R = window.OORender, CORE = window.OOSolverCore;
-const $ = (q, el) => (el || document).querySelector(q);
-const h = (tag, attrs, ...kids) => {
-  const el = document.createElement(tag);
-  for (const k in (attrs || {})) {
-    if (k === 'class') el.className = attrs[k];
-    else if (k === 'html') el.innerHTML = attrs[k];
-    else if (k.startsWith('on')) el.addEventListener(k.slice(2), attrs[k]);
-    else if (attrs[k] !== null && attrs[k] !== undefined) el.setAttribute(k, attrs[k]);
-  }
-  for (const kid of kids.flat()) if (kid !== null && kid !== undefined && kid !== false)
-    el.appendChild(typeof kid === 'string' ? document.createTextNode(kid) : kid);
-  return el;
-};
-function toast(msg) {
-  const t = h('div', { class: 'toast' }, msg);
-  document.body.appendChild(t);
-  setTimeout(() => t.classList.add('show'), 16);
-  setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 350); }, 3500);
-}
-const tick = () => new Promise(r => setTimeout(r, 0));
+const { h, $, toast, tick } = window.OODom;
 
 /* ---- tables (shares the Atlas page's IndexedDB cache) ---- */
 let dist = null, C = null, rotations = null, syms = null, rotBy = null;

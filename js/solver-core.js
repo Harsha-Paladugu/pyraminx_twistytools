@@ -148,17 +148,14 @@ function makeSolverCore(E, dist) {
     for (const [, c] of byKey) {
       let chosen = null;
       for (const sym of syms.rots) {
-        for (const tf of [sym]) {
-          const ms = E.optimalSolution(E.applySym(tf, probe), dist, false);
-          const full = (c.str ? c.str + ' ' : '') + ms;
-          const parsed = E.parseAlg(full);
-          if (parsed && E.eq(E.applyParsed(parsed, probe, syms, rotBy), E.solved())) {
-            const ms2 = E.optimalSolution(E.applySym(tf, probe2), dist, true);
-            if (E.eq(E.applyParsed(E.parseAlg((c.str ? c.str + ' ' : '') + ms2), probe2, syms, rotBy), E.solved())) {
-              chosen = { prefix: c.str, sym: tf };
-            }
+        const ms = E.optimalSolution(E.applySym(sym, probe), dist, false);
+        const full = (c.str ? c.str + ' ' : '') + ms;
+        const parsed = E.parseAlg(full);
+        if (parsed && E.eq(E.applyParsed(parsed, probe, syms, rotBy), E.solved())) {
+          const ms2 = E.optimalSolution(E.applySym(sym, probe2), dist, true);
+          if (E.eq(E.applyParsed(E.parseAlg((c.str ? c.str + ' ' : '') + ms2), probe2, syms, rotBy), E.solved())) {
+            chosen = { prefix: c.str, sym };
           }
-          if (chosen) break;
         }
         if (chosen) break;
       }
@@ -166,7 +163,7 @@ function makeSolverCore(E, dist) {
       out.push(chosen);
     }
     if (out.length !== 12) throw new Error('expected 12 rotation prefixes, got ' + out.length);
-    // deduplicate frames (each rotation should map to a distinct prefix); prefer fewest tokens
+    // frames were already deduplicated by byKey above; each surviving prefix maps to one rotation frame.
     return { rotations: out, syms, rotBy };
   }
 

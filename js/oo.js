@@ -3,19 +3,7 @@
 (function () {
 const E = window.OOEngine, R = window.OORender;
 const CFG = window.OO_CONFIG || {};
-const $ = (sel, el) => (el || document).querySelector(sel);
-const h = (tag, attrs, ...kids) => {
-  const el = document.createElement(tag);
-  for (const k in (attrs || {})) {
-    if (k === 'class') el.className = attrs[k];
-    else if (k === 'html') el.innerHTML = attrs[k];
-    else if (k.startsWith('on')) el.addEventListener(k.slice(2), attrs[k]);
-    else if (attrs[k] !== null && attrs[k] !== undefined) el.setAttribute(k, attrs[k]);
-  }
-  for (const kid of kids.flat()) if (kid !== null && kid !== undefined && kid !== false)
-    el.appendChild(typeof kid === 'string' ? document.createTextNode(kid) : kid);
-  return el;
-};
+const { h, $, toast, tick } = window.OODom;
 const fmt = n => n.toLocaleString('en-US');
 
 /* ---------------- tables: BFS + canonical classes, cached in IndexedDB ---------------- */
@@ -50,10 +38,13 @@ async function idbPut(payload) {
     db.close();
   } catch (e) { /* cache is best-effort */ }
 }
-const tick = () => new Promise(r => setTimeout(r, 0));
 
 async function buildTables(report) {
   T.syms = E.buildSyms();
+  // Build the canonicalizers once (each closes over T.syms); canonOf/mirrorOf
+  // below delegate to these, so the closures aren't rebuilt per call in hot loops.
+  T.canonOf = E.makeCanon(T.syms);
+  T.mirrorOf = E.makeMirrorCanon(T.syms);
   T.rotByCorner = E.makeFrames(T.syms);
   const cached = await idbGet();
   if (cached && cached.dist && cached.reps && cached.depths) {
@@ -108,8 +99,17 @@ function ordinalOf(classId) { // binary search in reps
     if (T.reps[mid] < classId) lo = mid + 1; else hi = mid - 1; }
   return -1;
 }
-const canonOf = s => E.makeCanon(T.syms)(s);
-const mirrorOf = s => E.makeMirrorCanon(T.syms)(s);
+const canonOf = s => T.canonOf(s);
+const mirrorOf = s => T.mirrorOf(s);
+const pairIdOf = cid => Math.min(cid, mirrorOf(E.unidx(cid)));
+// decode a base64 done-bitmap into a fresh Uint8Array sized to the class count
+// (a missing/empty string yields the all-zero bitmap).
+function decodeBitmap(b64) {
+  const bm = new Uint8Array(Math.ceil(T.reps.length / 8));
+  const bin = atob(b64 || '');
+  for (let i = 0; i < bin.length && i < bm.length; i++) bm[i] = bin.charCodeAt(i);
+  return bm;
+}
 // a state index is usable only if it's an in-range integer (E.unidx has no bounds
 // guard); client-side mirror of the Firestore create-rule bounds.
 const validId = id => Number.isInteger(id) && id >= 0 && id < E.NSLOTS;
@@ -262,12 +262,8 @@ function liveDB() {
     async doneMap() {
       try {
         const d = await F.getDoc(F.doc(fs, 'meta', 'doneMap'));
-        if (!d.exists()) return new Uint8Array(Math.ceil(T.reps.length / 8));
-        const b64 = d.data().b64 || '';
-        const bin = atob(b64); const bm = new Uint8Array(Math.ceil(T.reps.length / 8));
-        for (let i = 0; i < bin.length && i < bm.length; i++) bm[i] = bin.charCodeAt(i);
-        return bm;
-      } catch { return new Uint8Array(Math.ceil(T.reps.length / 8)); }
+        return decodeBitmap(d.exists() ? d.data().b64 : '');
+      } catch { return decodeBitmap(''); }
     },
     async pairSolutions(pairId) {
       const out = [];
@@ -304,11 +300,7 @@ function liveDB() {
         const data = sol.data();
         const mapRef = F.doc(fs, 'meta', 'doneMap'), statRef = F.doc(fs, 'meta', 'stats');
         const mapDoc = await tx.get(mapRef), statDoc = await tx.get(statRef);
-        const bm = new Uint8Array(Math.ceil(T.reps.length / 8));
-        if (mapDoc.exists() && mapDoc.data().b64) {
-          const bin = atob(mapDoc.data().b64);
-          for (let i = 0; i < bin.length && i < bm.length; i++) bm[i] = bin.charCodeAt(i);
-        }
+        const bm = decodeBitmap(mapDoc.exists() ? mapDoc.data().b64 : '');
         let added = 0;
         // Re-derive the partner from classId (matching pairOf's mirrorOf) rather
         // than trusting the submitter-supplied partnerId, so a forged value can't
@@ -361,17 +353,16 @@ function nav() {
         : h('button', { class: 'primary', onclick: () => DB.signIn().catch(e => toast(e.message)) }, 'Sign in with Google'));
   return new SiteNavbar({ active: 'oo', sub, right }).element();
 }
-function toast(msg) {
-  const t = h('div', { class: 'toast' }, msg);
-  document.body.appendChild(t);
-  setTimeout(() => t.classList.add('show'), 16);
-  setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 350); }, 3200);
-}
 async function renderInner() {
   const route = location.hash || '#/';
   const root = app(); root.innerHTML = '';
   root.appendChild(nav());
   const main = h('main', { class: 'page' }); root.appendChild(main);
+  // A failed DB.init() leaves sign-in / submissions / the solved map unavailable;
+  // surface it as a persistent banner (re-rendered on every navigation), not a
+  // transient toast. demoDB never fails, so this only shows in broken live mode.
+  if (DB && DB.failed) main.appendChild(h('div', { class: 'card error', style: 'margin:16px auto;max-width:680px' },
+    'Couldn’t connect to the database — sign-in, submissions and the solved map are unavailable. ' + DB.failed));
   if (!T.ready) { const b = $('#boot-status'); if (b) main.appendChild(b.cloneNode(true)); return; }
   try {
     if (route.startsWith('#/c/')) await pageClass(main, parseInt(route.slice(4), 10));
@@ -423,7 +414,7 @@ async function pageHome(main) {
       const bm = await DB.doneMap();
       for (let tries = 0; tries < 4000; tries++) {
         const o = Math.floor(Math.random() * T.reps.length);
-        if (!(bm[o >> 3] & (1 << (o & 7)))) { const cid = T.reps[o]; location.hash = '#/c/' + Math.min(cid, mirrorOf(E.unidx(cid))); return; }
+        if (!(bm[o >> 3] & (1 << (o & 7)))) { location.hash = '#/c/' + pairIdOf(T.reps[o]); return; }
       }
       toast('Couldn\u2019t find an unsolved position \u2014 looks like they\u2019re all done.');
     } }, 'Take me to an unsolved position'),
@@ -666,7 +657,7 @@ async function pageBrowse(main, route) {
   for (let i = pg * PER; i < Math.min(list.length, (pg + 1) * PER); i++) {
     const o = list[i], cid = T.reps[o];
     const st = E.unidx(cid);
-    grid.appendChild(h('a', { href: '#/c/' + Math.min(cid, mirrorOf(st)), class: 'classcell' + (isDone(o) ? ' done' : '') },
+    grid.appendChild(h('a', { href: '#/c/' + pairIdOf(cid), class: 'classcell' + (isDone(o) ? ' done' : '') },
       h('div', { html: R.netSVG(st, 124, { cls: 'oonet thumb', thumb: true }) }),
       h('div', { class: 'cellmeta' }, '#' + fmt(o + 1), isDone(o) ? h('span', { class: 'tick' }, ' \u2713') : null)));
   }
@@ -679,8 +670,7 @@ async function pageBrowse(main, route) {
       const un = full.filter(o => !isDone(o));
       if (!un.length) { toast('Every position at this depth is already solved \u2014 try another depth.'); return; }
       const o = un[Math.floor(Math.random() * un.length)];
-      const st = E.unidx(T.reps[o]);
-      location.hash = '#/c/' + Math.min(T.reps[o], mirrorOf(st));
+      location.hash = '#/c/' + pairIdOf(T.reps[o]);
     } }, 'random unsolved at this depth'));
   main.appendChild(pager);
 }
@@ -784,7 +774,7 @@ async function boot() {
   };
   DB = (window.OOAccount.mode === 'live') ? liveDB() : demoDB();
   DB.onChange(() => render());
-  const dbInit = DB.init().catch(e => toast('Database connection failed: ' + e.message));
+  const dbInit = DB.init().catch(e => { DB.failed = (e && e.message) || 'unknown error'; });
   await buildTables(report);
   await dbInit;
   bootEl.classList.add('gone');
