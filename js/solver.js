@@ -239,7 +239,27 @@ function slider(label, hint, key, min, max, step) {
       } }), val),
     h('div', { class: 'sliderhint' }, hint));
 }
-// one solution's reconstruction block + method badges + ergonomic score
+// per-move score breakdown table (from C.ergoScore(..., true).breakdown)
+function scoreBreakdown(bd, prefix) {
+  const sgn = v => (v < 0 ? '−' : '+') + Math.abs(v).toFixed(2);
+  const line = (idx, tok, parts, sum, cls) => h('div', { class: 'bkline' + (cls ? ' ' + cls : '') },
+    h('span', { class: 'bkidx' }, idx),
+    h('span', { class: 'bktok mono' }, tok),
+    h('span', { class: 'bkparts' }, parts),
+    h('span', { class: 'bksum mono' }, sum));
+  const rows = [];
+  if (bd.start && bd.start.cost > 0) {
+    const which = [bd.start.dl !== 0 ? 'left' : null, bd.start.dr !== 0 ? 'right' : null].filter(Boolean).join(' & ');
+    rows.push(line('', 'start', 'alternate start grip (' + which + ')', sgn(bd.start.cost)));
+  }
+  bd.steps.forEach((s, i) => rows.push(line(String(i + 1), s.tok,
+    s.parts.map(p => p.label + ' ' + sgn(p.val)).join('   ·   '), sgn(s.cost))));
+  if (bd.rotation && bd.rotation.count > 0)
+    rows.push(line('', prefix || 'rotation', 'rotation ×' + bd.rotation.count + (bd.rotation.cost ? ' × ' + bd.rotation.each : ' (free)'), sgn(bd.rotation.cost)));
+  rows.push(line('', 'total', '', bd.total.toFixed(2), 'bktotal'));
+  return h('div', { class: 'scorebreak' }, ...rows);
+}
+// one solution's reconstruction block + method badges + ergonomic score (+ expandable breakdown)
 function solutionRow(it) {
   const badges = Object.entries(it.methods).map(([id, m]) =>
     h('span', { class: 'mbadge', title: 'first step ' + m.v + ' → finish ' + m.fin + (m.cancel ? ', ' + m.cancel + ' canceled' : '') },
@@ -249,10 +269,17 @@ function solutionRow(it) {
     h('div', { class: 'recline' }, h('span', { class: 'recmv mono' }, l.mv), l.cmt ? h('span', { class: 'reccmt' }, l.cmt) : null));
   recEls.push(h('div', { class: 'reclabel' }, rec.finalLabel));
   recEls.push(h('div', { class: 'recline final' }, h('code', { class: 'recmv mono sol' }, rec.final)));
-  return h('div', { class: 'solrow solverrow' },
+  const row = h('div', { class: 'solrow solverrow' },
     h('div', { class: 'reconblock' }, h('div', { class: 'reconlines' }, ...recEls), copyBtn(rec.text)),
     h('div', { class: 'badgecell' }, badges),
+    h('button', { class: 'breaktoggle', 'aria-expanded': it._open ? 'true' : 'false',
+      title: 'show how the score is calculated',
+      onclick: () => { it._open = !it._open; render(); } }, (it._open ? '▾' : '▸') + ' score'),
     h('div', { class: 'solmeta scorechip', title: 'ergonomic cost — lower is nicer' }, String(it.score)));
+  if (!it._open) return row;
+  let bd = null;
+  try { bd = C.ergoScore(it.exec, it.prefix, UI.weights, true).breakdown; } catch (e) { return row; }
+  return h('div', { class: 'solentry' }, row, scoreBreakdown(bd, it.prefix));
 }
 function renderInner() {
   const root = $('#app'); root.innerHTML = '';

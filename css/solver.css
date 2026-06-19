@@ -54,6 +54,19 @@
 .reclabel{font:500 11.5px 'Instrument Sans',sans-serif;color:var(--dim);margin-top:5px}
 .recline.final{margin-top:2px}
 .recline.final .recmv{color:var(--yellow)}
+/* expandable per-move score breakdown */
+.solentry{border-top:1px solid var(--line)}
+.solentry .solverrow{border-top:none}
+.breaktoggle{align-self:flex-start;background:none;border:1px solid var(--line);border-radius:8px;color:var(--mut);font:600 11.5px 'Spline Sans Mono',monospace;cursor:pointer;padding:5px 9px;white-space:nowrap;transition:all .15s ease}
+.breaktoggle:hover{color:var(--paper);border-color:var(--mut)}
+.scorebreak{margin:0 0 12px;padding:10px 14px;background:rgba(0,0,0,.18);border:1px solid var(--line);border-radius:10px}
+.bkline{display:grid;grid-template-columns:20px 56px 1fr auto;gap:6px 12px;align-items:baseline;padding:2.5px 0}
+.bkidx{color:var(--dim);text-align:right;font:500 11px 'Spline Sans Mono',monospace}
+.bktok{color:var(--paper);font:600 13.5px 'Spline Sans Mono',monospace}
+.bkparts{color:var(--mut);font:500 12px 'Instrument Sans',sans-serif;overflow-wrap:anywhere}
+.bksum{color:var(--paper);text-align:right;font:600 13px 'Spline Sans Mono',monospace;min-width:52px}
+.bktotal{border-top:1px solid var(--line);margin-top:5px;padding-top:7px}
+.bktotal .bktok,.bktotal .bksum{color:var(--yellow);font-weight:700}
 .warnline{color:var(--yellow);font:500 13.5px 'Instrument Sans',sans-serif;margin:10px 2px}
 .hintline{max-width:560px}
 .pairrow.single{grid-template-columns:minmax(0,420px);justify-content:start}

@@ -177,7 +177,9 @@ function makeSolverCore(E, dist) {
     displacedTax: 0.12, startDelay: 0.2, bWindow: 2,
   };
   // physical token list (ints 0..7) -> { score, tokens (display strings; Rw/Lw substituted when cheaper) }
-  function ergoScore(seq, rotTokens, w) {
+  // detail=true also returns `breakdown`: { start, steps:[{tok,cost,parts:[{label,val}]}], rotation, total }
+  // tracing the minimal-cost path so the UI can show how each move contributes to the score.
+  function ergoScore(seq, rotTokens, w, detail) {
     w = Object.assign({}, ERGO_DEFAULTS, w || {});
     const { syms, rotBy } = ergoScore._rot || (ergoScore._rot = (() => { const s2 = E.buildSyms(); return { syms: s2, rotBy: E.makeFrames(s2) }; })());
     const ID = E.symFromFacePerm(E.FACE_ID, false);
@@ -192,7 +194,9 @@ function makeSolverCore(E, dist) {
     const startStates = new Map();
     for (const dl of [-1, 0, 1]) for (const dr of [-1, 0, 1]) {
       const c0 = (dl !== 0 ? w.startDelay : 0) + (dr !== 0 ? w.startDelay : 0);
-      startStates.set('0|' + dl + '|' + dr + '|' + CAP + '|' + CAP + '|n', { cost: c0, toks: [] });
+      const st0 = { cost: c0, toks: [] };
+      if (detail) st0.det = { start: { dl, dr, cost: c0 }, steps: [] };
+      startStates.set('0|' + dl + '|' + dr + '|' + CAP + '|' + CAP + '|n', st0);
     }
     let layer = startStates;
     for (let i = 0; i < seq.length; i++) {
@@ -208,6 +212,7 @@ function makeSolverCore(E, dist) {
         for (const r of renders) {
           let cost = 0, dl = +dl0, dr = +dr0, sl = +sl0, sr = +sr0;
           let hand = null, tok, nf = +fI;
+          const parts = detail ? [] : null;
           const L = r.letter;
           if (r.kind === 'wide') {
             tok = L + 'w' + (prime ? "'" : '');
@@ -224,31 +229,40 @@ function makeSolverCore(E, dist) {
             // motion as its underlying move done by the other hand's letter -- Rw acts like an L)
             hand = (r.kind === 'wide') ? (L === 'R' ? 'right' : 'left') : (L === 'L' ? 'left' : 'right');
             cost += r.kind === 'wide' ? w.wide : w.wrist;
+            if (parts) parts.push({ label: r.kind === 'wide' ? 'wide' : 'turn', val: r.kind === 'wide' ? w.wide : w.wrist });
             const dir = prime ? -1 : 1;
             // dial sense: right hand R = +1; left hand L' = +1 (thumb toward top), mirrored
             const delta = hand === 'right' ? dir : -dir;
             let cur = hand === 'left' ? dl : dr;
             let nd = cur + delta;
-            if (Math.abs(nd) > 1) { cost += w.silentReset; nd = delta; }
+            if (Math.abs(nd) > 1) { cost += w.silentReset; nd = delta; if (parts) parts.push({ label: 'hidden regrip', val: w.silentReset }); }
             if (hand === 'left') { dl = nd; sl = 0; sr = Math.min(CAP, sr + 1); }
             else { dr = nd; sr = 0; sl = Math.min(CAP, sl + 1); }
           } else if (L === 'U') {
             const cl = dl !== 0 ? w.uBusy : 0, cr = dr !== 0 ? w.uBusy : 0;
             hand = cl <= cr ? 'left' : 'right';
             cost += w.flickU + Math.min(cl, cr);
+            if (parts) { parts.push({ label: 'U flick', val: w.flickU }); if (Math.min(cl, cr) > 0) parts.push({ label: 'busy U', val: Math.min(cl, cr) }); }
             sl = Math.min(CAP, sl + 1); sr = Math.min(CAP, sr + 1);
           } else { // B: cheap only with a thumb up top AND recently placed there, or out of inspection
             const setup = (dr === 1 && sr <= w.bWindow) || (dl === 1 && sl <= w.bWindow) || i < w.grace;
             cost += setup ? w.bSetup : w.bCold;
+            if (parts) parts.push({ label: setup ? 'B set-up' : 'B cold', val: setup ? w.bSetup : w.bCold });
             hand = (dr === 1 && sr <= w.bWindow) ? 'right' : (dl === 1 && sl <= w.bWindow) ? 'left' : 'right';
             sl = Math.min(CAP, sl + 1); sr = Math.min(CAP, sr + 1);
           }
-          if (lh0 !== 'n' && lh0 !== hand) cost -= w.altBonus;       // hand alternation flows
-          cost += (dl !== 0 ? w.displacedTax : 0) + (dr !== 0 ? w.displacedTax : 0); // time away from home grip
+          if (lh0 !== 'n' && lh0 !== hand) { cost -= w.altBonus; if (parts) parts.push({ label: 'alternation', val: -w.altBonus }); }       // hand alternation flows
+          const disp = (dl !== 0 ? 1 : 0) + (dr !== 0 ? 1 : 0);
+          cost += disp * w.displacedTax; // time away from home grip
+          if (parts && disp > 0) parts.push({ label: 'away-from-home' + (disp > 1 ? ' ×' + disp : ''), val: disp * w.displacedTax });
           const nk = nf + '|' + dl + '|' + dr + '|' + sl + '|' + sr + '|' + hand;
           const tot = st.cost + cost;
           const prev = next.get(nk);
-          if (!prev || prev.cost > tot) next.set(nk, { cost: tot, toks: st.toks.concat(tok) });
+          if (!prev || prev.cost > tot) {
+            const ns = { cost: tot, toks: st.toks.concat(tok) };
+            if (detail) ns.det = { start: st.det.start, steps: st.det.steps.concat([{ tok, cost: +cost.toFixed(2), parts }]) };
+            next.set(nk, ns);
+          }
         }
       }
       layer = next;
@@ -256,7 +270,15 @@ function makeSolverCore(E, dist) {
     let best = null;
     for (const [, st] of layer) if (!best || st.cost < best.cost) best = st;
     const rotN = rotTokens ? rotTokens.split(/\s+/).filter(Boolean).length : 0;
-    return { score: +(best.cost + rotN * w.rotCost).toFixed(2), tokens: best.toks };
+    const score = +(best.cost + rotN * w.rotCost).toFixed(2);
+    const out = { score, tokens: best.toks };
+    if (detail) out.breakdown = {
+      start: best.det.start,
+      steps: best.det.steps,
+      rotation: { count: rotN, each: w.rotCost, cost: +(rotN * w.rotCost).toFixed(2) },
+      total: score,
+    };
+    return out;
   }
 
   /* ---------- the search ---------- */
