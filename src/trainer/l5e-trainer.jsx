@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import __sheet from "../../js/sheet.js";
+// L5E case class map (aufCanonKey -> set id). Authored data, kept out of code as
+// data/classmap.json (esbuild inlines the JSON at bundle time). Used by buildPools.
+import CLASSMAP from "../../data/classmap.json";
 
 // ============================================================
 // L5E Trainer — The Pyraminx Sheet sets
@@ -7,7 +10,7 @@ import __sheet from "../../js/sheet.js";
 // L4E: L4E (LL merged in), ML4E (Right + Left slot)
 // ============================================================
 
-const CLASSMAP = {"00,10,20,31,40,51":"bad-layers","00,11,21,31,40,51":"bad-layers","01,10,21,31,40,51":"bad-layers","01,11,20,31,40,51":"bad-layers","00,10,30,50,40,20":"bl5e","00,10,30,51,40,21":"kl5e","00,10,31,50,40,21":"bl5e","00,10,31,51,40,20":"kl5e","00,11,30,50,40,21":"bl5e","00,11,30,51,40,20":"kl5e","00,11,31,50,40,20":"bl5e","00,11,31,51,40,21":"kl5e","01,10,30,50,40,21":"bl5e","01,10,30,51,40,20":"kl5e","01,10,31,50,40,20":"bl5e","01,10,31,51,40,21":"kl5e","01,11,30,50,40,20":"bl5e","01,11,30,51,40,21":"kl5e","01,11,31,50,40,21":"bl5e","01,11,31,51,40,20":"kl5e","00,10,50,20,40,30":"bl5e","00,10,50,21,40,31":"kl5e","00,10,51,20,40,31":"kl5e","00,10,51,21,40,30":"bl5e","00,11,50,20,40,31":"kl5e","00,11,50,21,40,30":"bl5e","00,11,51,20,40,30":"bl5e","00,11,51,21,40,31":"kl5e","01,10,50,20,40,31":"kl5e","01,10,50,21,40,30":"bl5e","01,10,51,20,40,30":"bl5e","01,10,51,21,40,31":"kl5e","01,11,50,20,40,30":"bl5e","01,11,50,21,40,31":"kl5e","01,11,51,20,40,31":"kl5e","01,11,51,21,40,30":"bl5e","00,20,10,50,40,30":"bad-layers","00,20,10,51,40,31":"bad-layers","00,20,11,50,40,31":"bad-layers","00,20,11,51,40,30":"bad-layers","00,21,10,50,40,31":"bad-layers","00,21,10,51,40,30":"bad-layers","00,21,11,50,40,30":"bad-layers","00,21,11,51,40,31":"bad-layers","01,20,10,50,40,31":"bad-layers","01,20,10,51,40,30":"bad-layers","01,20,11,50,40,30":"bad-layers","01,20,11,51,40,31":"bad-layers","01,21,10,50,40,30":"bad-layers","01,21,10,51,40,31":"bad-layers","01,21,11,50,40,31":"bad-layers","01,21,11,51,40,30":"bad-layers","00,20,30,11,40,51":"fl5e","00,20,31,10,40,51":"fl5e","00,21,30,10,40,51":"fl5e","00,21,31,11,40,51":"fl5e","01,20,30,10,40,51":"fl5e","01,20,31,11,40,51":"fl5e","01,21,30,11,40,51":"fl5e","01,21,31,10,40,51":"fl5e","00,20,50,31,40,11":"fl5e","00,20,51,31,40,10":"fl5e","00,21,50,31,40,10":"fl5e","00,21,51,31,40,11":"fl5e","01,20,50,31,40,10":"fl5e","01,20,51,31,40,11":"fl5e","01,21,50,31,40,11":"fl5e","01,21,51,31,40,10":"fl5e","00,30,10,21,40,51":"fl5e","00,30,11,20,40,51":"fl5e","00,31,10,20,40,51":"fl5e","00,31,11,21,40,51":"fl5e","01,30,10,20,40,51":"fl5e","01,30,11,21,40,51":"fl5e","01,31,10,21,40,51":"fl5e","01,31,11,20,40,51":"fl5e","00,30,20,50,40,10":"bl5e","00,30,20,51,40,11":"kl5e","00,30,21,50,40,11":"bl5e","00,30,21,51,40,10":"kl5e","00,31,20,50,40,11":"bl5e","00,31,20,51,40,10":"kl5e","00,31,21,50,40,10":"bl5e","00,31,21,51,40,11":"kl5e","01,30,20,50,40,11":"bl5e","01,30,20,51,40,10":"kl5e","01,30,21,50,40,10":"bl5e","01,30,21,51,40,11":"kl5e","01,31,20,50,40,10":"bl5e","01,31,20,51,40,11":"kl5e","01,31,21,50,40,11":"bl5e","01,31,21,51,40,10":"kl5e","00,30,50,10,40,20":"ht","00,30,50,11,40,21":"ht","00,30,51,10,40,21":"yy","00,30,51,11,40,20":"yy","00,31,50,10,40,21":"yy","00,31,50,11,40,20":"yy","00,31,51,10,40,20":"ht","00,31,51,11,40,21":"ht","01,30,50,10,40,21":"ht","01,30,50,11,40,20":"ht","01,30,51,10,40,20":"yy","01,30,51,11,40,21":"yy","01,31,50,10,40,20":"yy","01,31,50,11,40,21":"yy","01,31,51,10,40,21":"ht","01,31,51,11,40,20":"ht","00,50,10,31,40,21":"fl5e","00,50,11,31,40,20":"fl5e","00,51,10,31,40,20":"fl5e","00,51,11,31,40,21":"fl5e","01,50,10,31,40,20":"fl5e","01,50,11,31,40,21":"fl5e","01,51,10,31,40,21":"fl5e","01,51,11,31,40,20":"fl5e","00,50,20,10,40,30":"bl5e","00,50,20,11,40,31":"kl5e","00,50,21,10,40,31":"kl5e","00,50,21,11,40,30":"bl5e","00,51,20,10,40,31":"kl5e","00,51,20,11,40,30":"bl5e","00,51,21,10,40,30":"bl5e","00,51,21,11,40,31":"kl5e","01,50,20,10,40,31":"kl5e","01,50,20,11,40,30":"bl5e","01,50,21,10,40,30":"bl5e","01,50,21,11,40,31":"kl5e","01,51,20,10,40,30":"bl5e","01,51,20,11,40,31":"kl5e","01,51,21,10,40,31":"kl5e","01,51,21,11,40,30":"bl5e","00,50,30,20,40,10":"ht","00,50,30,21,40,11":"ht","00,50,31,20,40,11":"yy","00,50,31,21,40,10":"yy","00,51,30,20,40,11":"yy","00,51,30,21,40,10":"yy","00,51,31,20,40,10":"ht","00,51,31,21,40,11":"ht","01,50,30,20,40,11":"ht","01,50,30,21,40,10":"ht","01,50,31,20,40,10":"yy","01,50,31,21,40,11":"yy","01,51,30,20,40,10":"yy","01,51,30,21,40,11":"yy","01,51,31,20,40,11":"ht","01,51,31,21,40,10":"ht","10,20,30,50,40,00":"bl5e","10,20,30,51,40,01":"kl5e","10,20,31,50,40,01":"bl5e","10,20,31,51,40,00":"kl5e","10,21,30,50,40,01":"bl5e","10,21,30,51,40,00":"kl5e","10,21,31,50,40,00":"bl5e","10,21,31,51,40,01":"kl5e","11,20,30,50,40,01":"bl5e","11,20,30,51,40,00":"kl5e","11,20,31,50,40,00":"bl5e","11,20,31,51,40,01":"kl5e","11,21,30,50,40,00":"bl5e","11,21,30,51,40,01":"kl5e","11,21,31,50,40,01":"bl5e","11,21,31,51,40,00":"kl5e","10,20,50,00,40,30":"bl5e","10,20,50,01,40,31":"kl5e","10,20,51,00,40,31":"kl5e","10,20,51,01,40,30":"bl5e","10,21,50,00,40,31":"kl5e","10,21,50,01,40,30":"bl5e","10,21,51,00,40,30":"bl5e","10,21,51,01,40,31":"kl5e","11,20,50,00,40,31":"kl5e","11,20,50,01,40,30":"bl5e","11,20,51,00,40,30":"bl5e","11,20,51,01,40,31":"kl5e","11,21,50,00,40,30":"bl5e","11,21,50,01,40,31":"kl5e","11,21,51,00,40,31":"kl5e","11,21,51,01,40,30":"bl5e","10,30,20,01,40,51":"fl5e","10,30,21,00,40,51":"fl5e","10,31,20,00,40,51":"fl5e","10,31,21,01,40,51":"fl5e","11,30,20,00,40,51":"fl5e","11,30,21,01,40,51":"fl5e","11,31,20,01,40,51":"fl5e","11,31,21,00,40,51":"fl5e","10,30,50,20,40,00":"ht","10,30,50,21,40,01":"ht","10,30,51,20,40,01":"yy","10,30,51,21,40,00":"yy","10,31,50,20,40,01":"yy","10,31,51,20,40,00":"ht","10,31,51,21,40,01":"ht","11,30,50,20,40,01":"ht","11,30,50,21,40,00":"ht","11,30,51,20,40,00":"yy","11,30,51,21,40,01":"yy","11,31,50,20,40,00":"yy","11,31,50,21,40,01":"yy","11,31,51,20,40,01":"ht","11,31,51,21,40,00":"ht","10,50,20,31,40,01":"fl5e","10,50,21,31,40,00":"fl5e","10,51,20,31,40,00":"fl5e","10,51,21,31,40,01":"fl5e","11,50,20,31,40,00":"fl5e","11,50,21,31,40,01":"fl5e","11,51,20,31,40,01":"fl5e","11,51,21,31,40,00":"fl5e","10,50,30,00,40,20":"ht","10,50,30,01,40,21":"ht","10,50,31,00,40,21":"yy","10,50,31,01,40,20":"yy","10,51,30,00,40,21":"yy","10,51,30,01,40,20":"yy","10,51,31,00,40,20":"ht","10,51,31,01,40,21":"ht","11,50,30,00,40,21":"ht","11,50,30,01,40,20":"ht","11,50,31,00,40,20":"yy","11,50,31,01,40,21":"yy","11,51,30,00,40,20":"yy","11,51,30,01,40,21":"yy","11,51,31,00,40,21":"ht","11,51,31,01,40,20":"ht","20,30,50,00,40,10":"ht","20,30,50,01,40,11":"ht","20,30,51,00,40,11":"yy","20,30,51,01,40,10":"yy","20,31,50,00,40,11":"yy","20,31,50,01,40,10":"yy","20,31,51,00,40,10":"ht","20,31,51,01,40,11":"ht","21,30,50,00,40,11":"ht","21,30,50,01,40,10":"ht","21,30,51,00,40,10":"yy","21,30,51,01,40,11":"yy","21,31,50,00,40,10":"yy","21,31,50,01,40,11":"yy","21,31,51,00,40,11":"ht","21,31,51,01,40,10":"ht","20,50,30,10,40,00":"ht","20,50,30,11,40,01":"ht","20,50,31,10,40,01":"yy","20,50,31,11,40,00":"yy","20,51,30,10,40,01":"yy","20,51,30,11,40,00":"yy","20,51,31,10,40,00":"ht","20,51,31,11,40,01":"ht","21,50,30,10,40,01":"ht","21,50,30,11,40,00":"ht","21,50,31,10,40,00":"yy","21,50,31,11,40,01":"yy","21,51,30,10,40,00":"yy","21,51,30,11,40,01":"yy","21,51,31,10,40,01":"ht","21,51,31,11,40,00":"ht","10,31,50,21,40,00":"yy"};
+// CLASSMAP moved to data/classmap.json (imported above).
 
 // ---------- pyraminx engine: single source = js/engine.js (window.OOEngine) ----------
 // Edge slots: 0 FL, 1 FR, 2 BK, 3 DF, 4 DL, 5 DR
@@ -290,10 +293,10 @@ function maskedScramble(target, dist) {
 // frame rotation [u] (re-express a DL-frame case with the bar at DR/DF) is
 // engine.rotateFrame, aliased above.
 const BAR_ROT = { DL: 0, DR: 1, DF: 2 };
-// L4E angle: the canonical L4E case has the open slot at the front (DF). ML4E-R
-// / ML4E-L are the SAME cases viewed from another angle (a frame rotation), so
-// presenting at the right/left slot is just a rotation of the front case.
-const L4E_ROT = { DF: 0, DL: 1, DR: 2 };
+// L4E angle: the canonical L4E case has the open slot at the front (DF). The
+// right/left slot (the old "ML4E-R/-L") is the SAME case from another angle —
+// makeScramble rotates the presentation until its open slot matches the chosen
+// angle, so no fixed rotation map is needed. Valid L4E slot ids are L4E_SLOTS.
 
 // ---------- state enumeration ----------
 // "scramble freeSlots, keep every other edge solved" — single source = engine.
@@ -388,6 +391,7 @@ const L4E_SLOTS = [
   { id: "DR", label: "Right (ML4E-R)" },
   { id: "DL", label: "Left (ML4E-L)" },
 ];
+const L4E_SLOT_IDS = new Set(L4E_SLOTS.map((s) => s.id));
 
 const GOAL_TYPES = [
   { id: "v", label: "V" },
@@ -598,7 +602,7 @@ export default function L5ETrainer() {
           }
           if (Array.isArray(d.l5eBars)) setL5eBars(new Set(d.l5eBars.filter((x) => x in BAR_ROT))); // may be empty (nothing selected)
           else if (d.bar && d.bar in BAR_ROT) setL5eBars(new Set([d.bar])); // migrate legacy single bar
-          if (Array.isArray(d.l4eSlots)) setL4eSlots(new Set(d.l4eSlots.filter((x) => x in L4E_ROT)));
+          if (Array.isArray(d.l4eSlots)) setL4eSlots(new Set(d.l4eSlots.filter((x) => L4E_SLOT_IDS.has(x))));
           if (Array.isArray(d.selected)) setSelected(new Set(d.selected.filter((id) => SET_BY_ID[id])));
           if (["drill", "recap", "solution", "recog"].includes(d.mode)) setMode(d.mode);
           if (typeof d.pso === "string") setPso(d.pso);
@@ -656,13 +660,18 @@ export default function L5ETrainer() {
 
   const makeScramble = useCallback((setId, caseKey, presArr, angle) => {
     // present the case at the given angle (bar for L5E, open slot for L4E); both
-    // are frame rotations of the canonical case.
-    const rotMap = setId === "l4e" ? L4E_ROT : BAR_ROT;
+    // are frame rotations of the canonical case. Rotate the chosen presentation
+    // until its side lands on the target angle (same pattern as displayState) —
+    // a fixed rotation count is wrong, since each presentation starts at an
+    // arbitrary slot. Slot-agnostic cases (Sune/2-flip, side "") never match and
+    // fall through unrotated, which is correct (identical at every slot).
     const a = angle || (setId === "l4e" ? "DF" : "DL");
+    const sideOf = (s) => (setId === "l4e" ? openOfEkey(stateKey(s)) : barOfEkey(stateKey(s)));
     let physical = null, scramble = null, uTwist = 0, target = 0;
     for (let attempt = 0; attempt < 30; attempt++) {
       const pres = presArr[Math.floor(Math.random() * presArr.length)];
-      physical = rotateFrame(copyState(pres.st), rotMap[a] || 0);
+      physical = copyState(pres.st);
+      for (let r = 0; r < 3; r++) { if (sideOf(physical) === a) break; physical = rotateFrame(physical, 1); }
       target = pres.t;
       scramble = maskedScramble(physical, distRef.current);
       if (!scramble) continue;
@@ -700,9 +709,6 @@ export default function L5ETrainer() {
     const byName = new Map();
     for (const ck of p.classes.keys()) {
       const name = SHEET.CNAME[ck] || ck;
-      // L4E: ML4E-named cases are the same L4E cases from another angle — drop
-      // them; the slot menu handles presenting the L4E cases from other slots.
-      if (setId === "l4e" && /^ML4E/.test(name)) continue;
       if (!byName.has(name)) byName.set(name, []);
       byName.get(name).push(ck);
     }
@@ -779,7 +785,6 @@ export default function L5ETrainer() {
       if (!angles.length) continue; // no presentation angle picked
       for (const [ck, sts] of pool.classes) {
         const name = SHEET.CNAME[ck] || ck;
-        if (id === "l4e" && /^ML4E/.test(name)) continue;
         if (caseSel.has(id + CASE_SEP + name)) continue;
         for (const angle of angles) {
           const kn = caseKnown.has(vkOf(id, angle) + CASE_SEP + name);

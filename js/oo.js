@@ -5,89 +5,36 @@ const E = window.OOEngine, R = window.OORender;
 const CFG = window.OO_CONFIG || {};
 const { h, $, toast, tick } = window.OODom;
 const fmt = n => n.toLocaleString('en-US');
+// Each scramble (a position + its mirror, keyed by pairId) keeps at most this many
+// approved solutions. Enforced app-side — in the submit form and at approval — since
+// Firestore rules can't count sibling docs. Approving/creating past it is blocked.
+const MAX_SOLUTIONS = 2;
+const moderatorFormUrl = () => String(CFG.moderatorFormUrl || '').trim();
 
 /* ---------------- tables: BFS + canonical classes, cached in IndexedDB ---------------- */
+// The IndexedDB cache + BFS/class-enumeration live in the shared js/tables.js
+// (window.OOTables), so the census and the solver share one dist table without
+// the old single-key value-shape ambiguity. tables.js must load before this file.
 const T = { dist: null, reps: null, depths: null, depthIdx: null, syms: null, rotByCorner: null, ready: false };
-const TABLE_VERSION = 'oo-tables-v1';
 // Depth-0 (the solved state) can't take a length-0 solution, so it counts as
 // solved by definition. `o` is an ordinal into T.reps.
 const isTrivial = (o) => T.depths[o] === 0;
 let browseFilter = 'all';   // depth browser: 'all' | 'unsolved' | 'solved'
 
-async function idbGet() {
-  if (!('indexedDB' in window)) return null;
-  try {
-    const db = await new Promise((res, rej) => { const r = indexedDB.open('pyraminx-oo', 1);
-      r.onupgradeneeded = () => r.result.createObjectStore('t');
-      r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
-    const v = await new Promise((res, rej) => { const tx = db.transaction('t').objectStore('t').get(TABLE_VERSION);
-      tx.onsuccess = () => res(tx.result); tx.onerror = () => rej(tx.error); });
-    db.close();
-    return v || null;
-  } catch (e) { return null; }
-}
-async function idbPut(payload) {
-  if (!('indexedDB' in window)) return;
-  try {
-    const db = await new Promise((res, rej) => { const r = indexedDB.open('pyraminx-oo', 1);
-      r.onupgradeneeded = () => r.result.createObjectStore('t');
-      r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
-    await new Promise((res, rej) => { const tx = db.transaction('t', 'readwrite');
-      tx.objectStore('t').put(payload, TABLE_VERSION);
-      tx.oncomplete = res; tx.onerror = () => rej(tx.error); });
-    db.close();
-  } catch (e) { /* cache is best-effort */ }
-}
-
 async function buildTables(report) {
+  if (!window.OOTables) throw new Error('js/tables.js must load before js/oo.js');
   T.syms = E.buildSyms();
   // Build the canonicalizers once (each closes over T.syms); canonOf/mirrorOf
   // below delegate to these, so the closures aren't rebuilt per call in hot loops.
   T.canonOf = E.makeCanon(T.syms);
   T.mirrorOf = E.makeMirrorCanon(T.syms);
   T.rotByCorner = E.makeFrames(T.syms);
-  const cached = await idbGet();
-  if (cached && cached.dist && cached.reps && cached.depths) {
-    T.dist = new Int8Array(cached.dist);
-    T.reps = new Uint32Array(cached.reps);
-    T.depths = new Uint8Array(cached.depths);
-    report('cache', 1, 1);
-  } else {
-    // BFS over the full 933,120-state space
-    const dist = new Int8Array(E.NSLOTS).fill(-1);
-    let frontier = new Uint32Array([E.idx(E.solved())]);
-    dist[frontier[0]] = 0;
-    let d = 0, seen = 1;
-    while (frontier.length) {
-      const next = [];
-      for (let fi = 0; fi < frontier.length; fi++) {
-        const s = E.unidx(frontier[fi]);
-        for (let m = 0; m < 8; m++) {
-          const t2 = E.copy(s); E.applyMoveIdx(t2, m);
-          const ix = E.idx(t2);
-          if (dist[ix] === -1) { dist[ix] = d + 1; next.push(ix); }
-        }
-        if ((fi & 8191) === 8191) { report('bfs', seen + next.length, 933120); await tick(); }
-      }
-      d++; seen += next.length;
-      frontier = Uint32Array.from(next);
-      report('bfs', seen, 933120); await tick();
-    }
-    T.dist = dist;
-    // canonical class enumeration
-    const reps = [], depths = [];
-    const canon = E.makeCanon(T.syms);
-    for (let i = 0; i < E.NSLOTS; i++) {
-      if (dist[i] < 0) continue;
-      const s = E.unidx(i);
-      if (canon(s) === i) { reps.push(i); depths.push(dist[i]); }
-      if ((i & 65535) === 65535) { report('classes', i, E.NSLOTS); await tick(); }
-    }
-    T.reps = Uint32Array.from(reps);
-    T.depths = Uint8Array.from(depths);
-    report('classes', E.NSLOTS, E.NSLOTS);
-    idbPut({ dist: T.dist.buffer, reps: T.reps.buffer, depths: T.depths.buffer });
-  }
+  // dist is shared with the solver (KEY_DIST); the canonical-class tables are
+  // census-only (KEY_CLASSES). Either cache miss rebuilds just that piece.
+  T.dist = await window.OOTables.loadOrBuildDist(E, report, tick);
+  const cls = await window.OOTables.loadOrBuildClassTables(E, T.dist, report, tick);
+  T.reps = cls.reps;
+  T.depths = cls.depths;
   T.depthIdx = Array.from({ length: 12 }, () => []);
   for (let o = 0; o < T.reps.length; o++) T.depthIdx[T.depths[o]].push(o);
   T.ready = true;
@@ -204,7 +151,11 @@ function demoDB() {
     async pending() { const d = load(); return d.solutions.filter(s => s.status === 'pending'); },
     async review(id, action) {
       const d = load(); const s = d.solutions.find(x => x.id === id);
-      if (s) { s.status = action; s.reviewedBy = A.user && A.user.email; }
+      if (!s) return;
+      if (action === 'approved'
+          && d.solutions.filter(x => x.pairId === s.pairId && x.status === 'approved').length >= MAX_SOLUTIONS)
+        throw new Error('CAP');
+      s.status = action; s.reviewedBy = A.user && A.user.email;
       save(d); notify();
     },
     async mods() { return load().mods; },
@@ -292,6 +243,14 @@ function liveDB() {
         await F.updateDoc(F.doc(fs, 'solutions', id), { status: 'rejected', reviewedBy: A.user.email });
         notify(); return;
       }
+      // Enforce the per-scramble cap before approving. Rules can't count sibling
+      // docs, so read the pending doc's pairId and query how many approved
+      // solutions the pair already has; throw CAP so pageMod can explain the block.
+      const preSnap = await F.getDoc(F.doc(fs, 'solutions', id));
+      if (!preSnap.exists() || preSnap.data().status !== 'pending') { notify(); return; }
+      const approvedQ = F.query(F.collection(fs, 'solutions'),
+        F.where('pairId', '==', preSnap.data().pairId), F.where('status', '==', 'approved'));
+      if ((await F.getDocs(approvedQ)).size >= MAX_SOLUTIONS) throw new Error('CAP');
       // approval: transaction updates the solution, the done bitmap and the counter
       await F.runTransaction(fs, async tx => {
         const solRef = F.doc(fs, 'solutions', id);
@@ -422,6 +381,15 @@ async function pageHome(main) {
 }
 
 /* ---------------- class / pair page ---------------- */
+// Call-to-action inviting a non-moderator to apply for access via the Google Form
+// configured in config.js (CFG.moderatorFormUrl). Renders a button when the URL is
+// set, otherwise a muted "not open yet" note so the space is there either way.
+function requestModBlock() {
+  const url = moderatorFormUrl();
+  return url
+    ? h('button', { class: 'primary', onclick: () => window.open(url, '_blank', 'noopener') }, 'Request moderator access')
+    : h('p', { class: 'empty' }, 'Moderator applications aren’t open yet — check back soon.');
+}
 function copyBtn(text) {
   return h('button', { class: 'copy', title: 'Copy', 'aria-label': 'Copy', onclick: ev => {
     (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject())
@@ -582,10 +550,18 @@ async function pageClass(main, anyId) {
 
   /* submit */
   const sub = h('section', { class: 'card subcard' }, h('h3', null, 'Submit a solution'));
-  if (!DB.user) {
-    sub.appendChild(h('p', null, 'You can browse everything without an account. Sign in with Google when you want to submit a solution.'));
+  if (approved.length >= MAX_SOLUTIONS) {
+    // Every scramble keeps at most MAX_SOLUTIONS solutions — this one is full.
+    sub.appendChild(h('p', { class: 'empty' }, 'This scramble already has ' + MAX_SOLUTIONS + ' solutions — the maximum. Thanks for looking!'));
+  } else if (!DB.user) {
+    sub.appendChild(h('p', null, 'You can browse everything without an account. Submitting solutions is limited to moderators — sign in with Google to get started.'));
     sub.appendChild(h('button', { class: 'primary', onclick: () => DB.signIn().catch(() => toast('Sign-in didn’t go through. Please try again.')) }, 'Sign in with Google'));
+  } else if (!DB.isMod) {
+    sub.appendChild(h('p', null, 'Only moderators can submit solutions. If you’d like to help build the collection, you can apply to become one.'));
+    sub.appendChild(requestModBlock());
   } else {
+    sub.appendChild(h('p', { style: 'color:var(--mut);font-size:13.5px;margin:.1em 0 .9em' },
+      approved.length + ' of ' + MAX_SOLUTIONS + ' solutions recorded for this scramble.'));
     const ta = h('textarea', { class: 'mono solin', rows: '2',
       placeholder: "e.g.  [r] L U' Rw B2 U L'   (rotations free \u00b7 wides & doubles 1 move \u00b7 tips ignored \u00b7 max 15)" });
     const status = h('div', { class: 'verifyline' }, 'Type a solution. We check it as you go, against every rotation of both mirrors.');
@@ -706,7 +682,12 @@ async function pageMod(main) {
         h('button', { class: 'primary', disabled: v.ok ? null : '', onclick: async ev => {
           ev.target.setAttribute('disabled', '');
           try { await DB.review(s.id, 'approved'); toast('Approved. Position marked solved.'); render(); }
-          catch (err) { toast('Something went wrong approving that. Please try again.'); ev.target.removeAttribute('disabled'); }
+          catch (err) {
+            toast(err && err.message === 'CAP'
+              ? 'This scramble already has ' + MAX_SOLUTIONS + ' solutions (the maximum). Reject this one instead.'
+              : 'Something went wrong approving that. Please try again.');
+            ev.target.removeAttribute('disabled');
+          }
         } }, 'Approve'),
         h('button', { class: 'danger', onclick: async () => { await DB.review(s.id, 'rejected'); toast('Rejected.'); render(); } }, 'Reject'),
         h('a', { class: 'ghost', href: '#/c/' + s.pairId }, 'open position')));
@@ -747,9 +728,12 @@ function pageAbout(main) {
       nrow('[u] [l] [r] [b], y', 'rotations \u00b7 0 moves', 'rotate the whole puzzle; y is the same as [u]'),
       nrow('u l r b (lowercase)', 'tips \u00b7 ignored', 'scrambles can include tip moves; we just strip them out')),
     h('h3', null, 'Submitting and review'),
-    h('p', null, 'Solutions can be up to 15 moves and are checked automatically: they have to really solve the scramble, from any rotation, on either mirror. A moderator then reviews each one before it goes live, and we check it again at that point. The first approved solution claims the position.'),
+    h('p', null, 'Submitting solutions is limited to moderators. Solutions can be up to 15 moves and are checked automatically: they have to really solve the scramble, from any rotation, on either mirror. A moderator then reviews each one before it goes live, and we check it again at that point. Each scramble keeps at most ' + MAX_SOLUTIONS + ' solutions, so once two are approved that position is settled.'),
+    h('h3', null, 'Becoming a moderator'),
+    h('p', null, 'Want to help build the collection? Anyone can apply to become a moderator \u2014 moderators are the ones who submit and review solutions.'),
+    requestModBlock(),
     h('h3', null, 'Privacy'),
-    h('p', null, 'Anyone can browse without an account. To submit, you sign in with Google. Your name shows up on a solution only if you leave \u201cshow my name\u201d checked.')));
+    h('p', null, 'Anyone can browse without an account. Your name shows up on a solution only if you leave \u201cshow my name\u201d checked.')));
   if (DB.user) main.appendChild(h('section', { class: 'card prose' },
     h('h3', null, 'Your account'),
     h('p', null, 'Signed in as ' + (DB.user.email || DB.user.name) + '.'),

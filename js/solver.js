@@ -4,49 +4,17 @@
 const E = window.OOEngine, R = window.OORender, CORE = window.OOSolverCore;
 const { h, $, toast, tick } = window.OODom;
 
-/* ---- tables (shares the Atlas page's IndexedDB cache) ---- */
+/* ---- tables (shared dist cache via js/tables.js \u2014 same IndexedDB the OO page uses) ---- */
 let dist = null, C = null, rotations = null, syms = null, rotBy = null;
-async function idb(mode, payload) {
-  if (!('indexedDB' in window)) return null;
-  try {
-    const db = await new Promise((res, rej) => { const r = indexedDB.open('pyraminx-oo', 1);
-      r.onupgradeneeded = () => r.result.createObjectStore('t');
-      r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
-    const out = await new Promise((res, rej) => {
-      const tx = db.transaction('t', mode === 'get' ? 'readonly' : 'readwrite').objectStore('t');
-      const rq = mode === 'get' ? tx.get('oo-tables-v1') : tx.put(payload, 'oo-tables-v1');
-      rq.onsuccess = () => res(rq.result); rq.onerror = () => rej(rq.error); });
-    db.close();
-    return out || null;
-  } catch (e) { return null; }
-}
 async function boot() {
+  if (!window.OOTables) throw new Error('js/tables.js must load before js/solver.js');
   const label = $('#boot-label'), bar = $('#boot-bar'), track = $('#boot-track');
   const rep = (t, n, tot) => { const pct = Math.round(100 * n / tot); label.textContent = t; bar.style.width = pct + '%'; if (track) track.setAttribute('aria-valuenow', pct); };
-  const cached = await idb('get');
-  if (cached && cached.dist) { dist = new Int8Array(cached.dist); rep('Loading cached tables\u2026', 1, 1); }
-  else {
-    const d = new Int8Array(E.NSLOTS).fill(-1);
-    let frontier = new Uint32Array([E.idx(E.solved())]);
-    d[frontier[0]] = 0;
-    let dd = 0, seen = 1;
-    while (frontier.length) {
-      const next = [];
-      for (let fi = 0; fi < frontier.length; fi++) {
-        const s = E.unidx(frontier[fi]);
-        for (let m = 0; m < 8; m++) {
-          const t2 = E.copy(s); E.applyMoveIdx(t2, m);
-          const ix = E.idx(t2);
-          if (d[ix] === -1) { d[ix] = dd + 1; next.push(ix); }
-        }
-        if ((fi & 8191) === 8191) { rep('Mapping all 933,120 positions\u2026', seen + next.length, 933120); await tick(); }
-      }
-      dd++; seen += next.length; frontier = Uint32Array.from(next);
-      rep('Mapping all 933,120 positions\u2026', seen, 933120); await tick();
-    }
-    dist = d;
-    idb('put', { dist: dist.buffer }); // Atlas page upgrades this with class tables on next visit
-  }
+  // dist is shared with the OO census (KEY_DIST); the census enriches the same
+  // IndexedDB with its class tables under a separate key, so neither clobbers the other.
+  dist = await window.OOTables.loadOrBuildDist(E,
+    (stage, n, tot) => rep(stage === 'cache' ? 'Loading cached tables\u2026' : 'Mapping all 933,120 positions\u2026', n, tot),
+    tick);
   rep('Preparing solver\u2026', 0, 1);
   await tick();
   C = CORE.makeSolverCore(E, dist);

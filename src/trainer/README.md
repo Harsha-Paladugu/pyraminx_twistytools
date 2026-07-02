@@ -5,7 +5,9 @@ deployed trainer**. It builds to `js/trainer.js`, which `trainer.html` serves in
 production. Edit here, rebuild, commit the regenerated `js/trainer.js`.
 
 ## Files
-- `l5e-trainer.jsx` — the trainer React component (engine, sheet data, UI).
+- `l5e-trainer.jsx` — the trainer React component (engine, sheet data, UI). The
+  L5E case-class map is authored data, imported from `../../data/classmap.json`
+  (esbuild inlines it at bundle time), not an inline literal.
 - `index.jsx` — entry point: mounts `<L5ETrainer/>` at `#root`, provides a
   localStorage fallback for `window.storage`.
 
@@ -39,8 +41,8 @@ account. Commit the regenerated `js/trainer.js` with your source change.
   back to localStorage when signed out.
 
 ## Status
-Cut over: `trainer.html` serves the build of this source (`js/trainer.js?v=5`),
-preceded by `js/engine.js` + `js/render.js`. The pre-cutover bundle remains in
-git history for rollback. `js/trainer.js` is a generated artifact but is
-committed (it's what the static site serves); always rebuild it before
-committing source changes.
+Cut over: `trainer.html` serves the build of this source (`js/trainer.js`,
+loaded with a content-hash `?v=` that `npm run stamp` maintains), preceded by
+`js/engine.js` + `js/render.js`. The pre-cutover bundle remains in git history
+for rollback. `js/trainer.js` is a generated artifact but is committed (it's what
+the static site serves); always rebuild it before committing source changes.

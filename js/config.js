@@ -17,6 +17,11 @@ window.OO_CONFIG = {
 
      },
 
-     adminEmails: ["harsha.paladugu2@gmail.com"]   // your Google account email
+     adminEmails: ["harsha.paladugu2@gmail.com"],   // your Google account email
+
+     // Public Google Form where visitors can apply to become a moderator. Paste
+     // the form's share URL here; the OO page links it wherever it invites people
+     // to request access. Leave "" to show a "not open yet" note instead of a link.
+     moderatorFormUrl: ""
 
    };

@@ -49,15 +49,19 @@ js/trainer.js (generated)      → trainer & solver read the compiled sheet
 
 ```
 npm install
-npm run build       # = build:sheet (compile data) + bundle the trainer
+npm run build       # build:sheet + bundle trainer + stamp asset hashes + check
 npm run check       # verify the compiled sheet against the engine (also: npm test)
+npm run check:fresh # assert the committed generated files + HTML stamps are fresh
+npm run test:engine # engine unit tests
 npm run watch:trainer   # esbuild watch (note: does NOT recompile the sheet)
 ```
 
-Deploy is just the static files (no server). After changing any `js/`/`css/`
-file, bump its `?v=N` query in the HTML so browsers re-fetch it; the generated
-`js/sheet.js`/`js/trainer.js` are committed so the site works without a build on
-the host.
+Deploy is just the static files (no server). Cache-busting is automatic: every
+local `js/`/`css/`/`img` asset is loaded with a content-hash `?v=` query that
+`npm run stamp` (part of `npm run build`) rewrites from the file's bytes — there
+is no manual version to bump. The generated `js/sheet.js`/`js/trainer.js` are
+committed so the site works without a build on the host, and `npm run check:fresh`
+guards against committing a stale build.
 
 ### Editing the algorithm sheet
 
@@ -77,6 +81,15 @@ store.
 - **`tools/check-sheet.mjs`** — verifier of the shipped `js/sheet.js`, run via
   `npm run check` (also wired into `npm run build`). It shares the engine's keying
   helpers, so it catches data/structural problems but not engine-level keying bugs.
+  The known-broken setup algs it tolerates are an explicit allowlist,
+  **`data/broken-algs.json`** (read by the compiler and the checker), not a count.
+- **`tools/stamp-assets.mjs`** — rewrites each asset's `?v=` query to an 8-hex
+  content hash (`npm run stamp`, part of `npm run build`).
+- **`tools/check-fresh.mjs`** — re-runs the pipeline and asserts the committed
+  generated files + HTML stamps match a clean build (`npm run check:fresh`).
+- **`tools/test-engine.mjs`** — focused engine unit tests (`npm run test:engine`).
+  Firestore-rules tests live in `test/` (`npm run test:rules`, opt-in: needs the
+  Firebase emulator + dev deps).
 - **`build.mjs`** — esbuild config for the React trainer.
 
 ### Module strategy (why no `"type": "module"`)

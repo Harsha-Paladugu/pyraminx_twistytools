@@ -38,21 +38,45 @@ service cloud.firestore {
       allow read: if resource.data.status == 'approved'
         || isMod()
         || (request.auth != null && request.auth.uid == resource.data.uid);
-      allow create: if request.auth != null
+      // Create: only a moderator may submit, and only their own pending solution.
+      // The field set is whitelisted (no extra/oversized docs) and every field the
+      // client writes (js/oo.js submit()) is type/size validated. State-index bounds
+      // are [0, NSLOTS) where NSLOTS = 720*64*27*3 = 3,732,480 (engine.js).
+      // NOTE: the "max 2 approved solutions per scramble" cap can't be enforced
+      // here — rules can't count sibling docs — so it's applied app-side in js/oo.js
+      // (submit form gating + the moderator approval step).
+      allow create: if isMod()
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.status == 'pending'
+        && request.resource.data.keys().hasOnly([
+            'uid', 'status', 'createdAt', 'pairId', 'classId', 'partnerId',
+            'scramble', 'solution', 'moves', 'name', 'showName'])
+        && request.resource.data.createdAt == request.time
         && request.resource.data.moves is int
         && request.resource.data.moves >= 1 && request.resource.data.moves <= 15
         && request.resource.data.solution is string
         && request.resource.data.solution.size() > 0
         && request.resource.data.solution.size() < 300
+        && request.resource.data.scramble is string
+        && request.resource.data.scramble.size() > 0
+        && request.resource.data.scramble.size() < 300
+        && request.resource.data.name is string
+        && request.resource.data.name.size() < 256
+        && request.resource.data.showName is bool
         && request.resource.data.classId is int
         && request.resource.data.classId >= 0 && request.resource.data.classId < 3732480
         && request.resource.data.partnerId is int
         && request.resource.data.partnerId >= 0 && request.resource.data.partnerId < 3732480
         && request.resource.data.pairId is int
         && request.resource.data.pairId >= 0 && request.resource.data.pairId < 3732480;
-      allow update: if isMod();
+      // Update: a moderator may only flip the review fields (status -> approved/
+      // rejected, plus reviewedBy); an admin may edit more broadly if ever needed.
+      // This stops a moderator account from rewriting submitted solution content.
+      allow update: if isAdmin()
+        || (isMod()
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'reviewedBy'])
+            && request.resource.data.status in ['approved', 'rejected']
+            && request.resource.data.reviewedBy is string);
       allow delete: if isAdmin();
     }
 

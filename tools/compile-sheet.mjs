@@ -38,6 +38,12 @@ const E = globalThis.window.OOEngine;
 // JSON. Re-baseline by overwriting prior-sheet.json with a freshly built sheet.
 const OLD = require(path.join(ROOT, 'data', 'prior-sheet.json'));
 const J = require(path.join(ROOT, 'data', 'pyraminx_algs.json'));
+// Explicit allowlist of known-broken setup algs (parse fine but don't solve their
+// render key) carried forward only to avoid empty panels. Named manifest, not a
+// count: a NEW broken alg that isn't listed here fails the build. Keys are
+// `renderKey :: alg` on the SHIPPED (post-normAlg) notation; see check-sheet.mjs.
+const BROKEN = require(path.join(ROOT, 'data', 'broken-algs.json'));
+const BROKEN_KEYS = new Set(BROKEN.map(b => b.renderKey + ' :: ' + b.algorithm));
 
 // keying + alg→case helpers are the engine's single source of truth.
 const { stateKey, realCanonKey, caseStateOf, algSolvesKey, applyMoveK } = E;
@@ -45,7 +51,11 @@ const { stateKey, realCanonKey, caseStateOf, algSolvesKey, applyMoveK } = E;
 // ---- naming ----
 const DEFERRED = new Set(['TL4E-B', 'TL4E-R', 'Pseudo-V', 'L4E Building Blocks', 'L4E']);
 function subsetLabel(subsetKey, alg) {
-  if (subsetKey === 'ML4E') return /Right/i.test(String(alg.direction || '')) ? 'ML4E-R' : 'ML4E-L';
+  // ML4E (the right/left open-slot angles) is the same family as L4E viewed from
+  // another slot. Label its algs as plain "L4E" so the trainer presents them as
+  // L4E cases at the chosen slot; the U-twist in the canonical key still keeps
+  // genuinely-distinct cases separate (no force-merge by geometry).
+  if (subsetKey === 'ML4E') return 'L4E';
   return subsetKey;
 }
 function labelOf(subsetKey, caseName, alg) {
@@ -53,6 +63,11 @@ function labelOf(subsetKey, caseName, alg) {
   return lbl === caseName ? caseName : lbl + ' · ' + caseName;
 }
 const casePart = (name) => String(name).split(' · ').slice(-1)[0];
+// Normalize any legacy "ML4E-R/-L · X" name from the carry-forward baseline to
+// the plain "L4E · X" prefix, matching subsetLabel above, so the ML4E label is
+// gone everywhere (JSON-primary AND carried-forward names) and same-named cases
+// combine in the trainer. Case identity (the U-twist) is untouched.
+const normName = (name) => String(name).replace(/^ML4E(?:-[RL])? · /, 'L4E · ');
 
 // ---- pass 1: group every alg by the canonical key it actually solves ----
 const byKey = {}; // canon -> { items:[{alg, renderKey, label, deferred}] }
@@ -77,8 +92,8 @@ function resolveName(canon, items) {
   const votes = {};
   for (const it of items) votes[it.label] = (votes[it.label] || 0) + 1;
   const top = Object.entries(votes).sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))[0][0];
-  const old = OLD.CNAME[canon];
-  if (old) {
+  const old = normName(OLD.CNAME[canon]);
+  if (OLD.CNAME[canon]) {
     if (votes[old]) return old;                          // old label still supported
     if (casePart(old) === casePart(top)) return old;     // same case, prefix-only change -> keep old
   }
@@ -127,7 +142,7 @@ for (const [canon, rec] of Object.entries(byKey)) {
 // with no JSON-primary alg keep their old name.
 for (const [canon, pres] of Object.entries(OLD.PRES)) {
   const hadPrimary = MAIN.CNAME[canon] != null;
-  if (!hadPrimary) { MAIN.CNAME[canon] = OLD.CNAME[canon]; report.carried++; }
+  if (!hadPrimary) { MAIN.CNAME[canon] = normName(OLD.CNAME[canon]); report.carried++; }
   const name = MAIN.CNAME[canon];
   const presArr = (MAIN.PRES[canon] = MAIN.PRES[canon] || []);
   // valid = old algs that actually solve their presentation (drop OLD's broken,
@@ -161,7 +176,7 @@ for (const rk of Object.keys(OLD.ALG)) {
   if (!(OLD.ALG[rk] || []).length) continue;
   if (auf3(rk).some(k => (MAIN.ALG[k] || []).length)) continue; // NEW already covers this state
   const canon = realCanonKey({ e: rk.split('|')[0].split(',').flatMap(t => [+t[0], +t[1]]), c: [0, 0, 0] }, +rk.split('|')[1]);
-  const name = MAIN.CNAME[canon] || OLD.CNAME[canon];
+  const name = MAIN.CNAME[canon] || normName(OLD.CNAME[canon]);
   if (MAIN.CNAME[canon] == null) MAIN.CNAME[canon] = name;
   const [sk, tw] = rk.split('|');
   (MAIN.PRES[canon] = MAIN.PRES[canon] || []);
@@ -185,14 +200,23 @@ for (const SH of [MAIN, DEF]) {
 }
 
 // ---- self-check: every emitted MAIN alg solves its render key (up to rotation),
-// except the small set of OLD broken algs deliberately kept to avoid empty panels.
-let solveFail = 0;
+// except the explicitly-allowlisted broken setup algs in data/broken-algs.json
+// (kept to avoid empty panels). A failing alg that ISN'T allowlisted fails the
+// build; an allowlisted entry that no longer fails is just a stale-manifest note.
+const failingBroken = [];
 for (const [rk, algs] of Object.entries(MAIN.ALG))
-  for (const [alg] of algs) if (!algSolvesKey(alg, rk)) solveFail++;
-const selfCheckOk = solveFail === report.keptBroken;
+  for (const [alg] of algs) if (!algSolvesKey(alg, rk)) failingBroken.push(rk + ' :: ' + alg);
+const unexpectedBroken = failingBroken.filter(k => !BROKEN_KEYS.has(k));
+const staleBroken = [...BROKEN_KEYS].filter(k => !failingBroken.includes(k));
+const selfCheckOk = unexpectedBroken.length === 0;
 if (!selfCheckOk) {
-  console.error('SELF-CHECK FAILED: ' + solveFail + ' MAIN algs do not solve their key (expected ' + report.keptBroken + ' kept-broken)');
+  console.error('SELF-CHECK FAILED: ' + unexpectedBroken.length + ' MAIN alg(s) do not solve their key and are not in data/broken-algs.json:');
+  unexpectedBroken.forEach(k => console.error('   BROKEN ' + k));
   process.exitCode = 1;
+}
+if (staleBroken.length) {
+  console.warn('NOTE: ' + staleBroken.length + ' allowlisted broken alg(s) no longer fail — data/broken-algs.json may be stale:');
+  staleBroken.forEach(k => console.warn('   STALE ' + k));
 }
 
 // ---- write js/sheet.js (replace only the SHEET data line) ----
@@ -251,8 +275,8 @@ if (report.misfiled.length) {
 
 // coverage guarantee vs old
 const gaps = Object.keys(OLD.CNAME).filter(k => !MAIN.CNAME[k]);
-console.log('\nself-check: every emitted alg solves its render key, except', report.keptBroken, 'kept-broken ->',
-  solveFail === report.keptBroken ? 'PASS' : 'FAIL');
+console.log('\nself-check: every emitted alg solves its render key, except', failingBroken.length, 'allowlisted broken (' + BROKEN_KEYS.size + ' in manifest) ->',
+  selfCheckOk ? 'PASS' : 'FAIL');
 console.log('COVERAGE: old CNAME keys', Object.keys(OLD.CNAME).length, '| gaps in MAIN:', gaps.length,
   gaps.length ? '  *** REGRESSION ***' : '  (none)');
 console.log('intentional renames vs old (' + report.renames.length + '):');

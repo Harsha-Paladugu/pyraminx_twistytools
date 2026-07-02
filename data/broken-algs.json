@@ -1,0 +1,30 @@
+[
+  {
+    "renderKey": "00,10,30,41,21,50|0",
+    "algorithm": "[u'] L R' U' R U L'",
+    "subset": "KL5E-R",
+    "case": "Keyhole",
+    "reason": "Setup-style alg carried forward from data/prior-sheet.json: it parses but does not geometrically solve its render key. Kept (only because no clean alg covers this state's 3 AUF) so the Keyhole panel is not empty."
+  },
+  {
+    "renderKey": "00,10,31,51,40,20|0",
+    "algorithm": "[u] R' L U L' U' R",
+    "subset": "KL5E-L",
+    "case": "Keyhole",
+    "reason": "Setup-style alg carried forward from data/prior-sheet.json: it parses but does not geometrically solve its render key. Kept (only because no clean alg covers this state's 3 AUF) so the Keyhole panel is not empty."
+  },
+  {
+    "renderKey": "11,21,30,41,01,50|1",
+    "algorithm": "[u'] U' L U R' U R U L'",
+    "subset": "KL5E-R",
+    "case": "Keyhole",
+    "reason": "Setup-style alg carried forward from data/prior-sheet.json: it parses but does not geometrically solve its render key. Kept (only because no clean alg covers this state's 3 AUF) so the Keyhole panel is not empty."
+  },
+  {
+    "renderKey": "20,01,31,51,40,11|2",
+    "algorithm": "[u] U R' U' L U' L' U' R",
+    "subset": "KL5E-L",
+    "case": "Keyhole",
+    "reason": "Setup-style alg carried forward from data/prior-sheet.json: it parses but does not geometrically solve its render key. Kept (only because no clean alg covers this state's 3 AUF) so the Keyhole panel is not empty."
+  }
+]

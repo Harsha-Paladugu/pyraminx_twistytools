@@ -8,18 +8,22 @@ Pyraminx.net is a **static, no-build-required website** for no-tips Pyraminx sol
 
 ```bash
 npm install
-npm run build         # full pipeline: build:trainer (sheet + trainer bundle) then npm run check
+npm run build         # full pipeline: build:trainer (sheet + trainer bundle), then stamp asset hashes, then npm run check
 npm run build:trainer # build:sheet, then esbuild-bundle the trainer (node build.mjs) → js/trainer.js
 npm run build:sheet   # compile data/pyraminx_algs.json → js/sheet.js only
 npm run watch:trainer # esbuild watch on src/trainer (node build.mjs --watch) — does NOT recompile the sheet
+npm run stamp         # rewrite each asset's ?v= query to its content hash (tools/stamp-assets.mjs)
 npm run check         # verify the shipped js/sheet.js against the engine (alias: npm test)
+npm run check:fresh   # re-run the pipeline; fail if js/sheet.js, js/trainer.js or any HTML stamp is stale
+npm run test:engine   # engine unit tests (tools/test-engine.mjs)
+npm run test:rules    # Firestore rules emulator tests (opt-in: needs the emulator + dev deps)
 
 node tools/compile-sheet.mjs --check   # dry-run compile + report; never writes js/sheet.js
 ```
 
 The esbuild step lives in `build.mjs` at the repo root (entry `src/trainer/index.jsx` → `js/trainer.js`); there is no separate `build:trainer`-only esbuild script — `node build.mjs` is it.
 
-- There is **no unit-test framework**. `npm test` is aliased to `tools/check-sheet.mjs`, which only validates the compiled data sheet. To exercise the engine ad-hoc in Node, replicate what the tools do: `globalThis.window = {}; require('./js/engine.js'); const E = globalThis.window.OOEngine;` (see the "module strategy" gotcha below).
+- There is **no unit-test framework**, but two dependency-light test runners exist. `npm test` is aliased to `tools/check-sheet.mjs` (validates the compiled data sheet only). `npm run test:engine` (`tools/test-engine.mjs`) asserts engine invariants — alg parse/notation, mirror/inverse symmetry, `realCanonKey` stability, the optimal BFS solver. `npm run test:rules` (`test/firestore.rules.test.mjs`) is opt-in and needs the Firebase emulator + dev deps. To exercise the engine ad-hoc in Node, replicate what the tools do: `globalThis.window = {}; require('./js/engine.js'); const E = globalThis.window.OOEngine;` (see the "module strategy" gotcha below).
 - **To preview the site locally you must serve over HTTP** (e.g. `npx serve` or `python -m http.server`), not `file://` — `js/account.js` uses dynamic `import()` and the OO/Algorithms pages `fetch` the JSON, both of which need an origin.
 
 ## Generated files — do not hand-edit
@@ -31,7 +35,7 @@ Both are committed so the site works on the host without a build. Edit the *sour
 
 ## Cache-busting discipline
 
-Every `js/`/`css/` file is loaded with a `?v=N` query in the HTML. **After editing any such file, bump its `?v=N` in every HTML page that loads it** (`grep` the filename across `*.html`), or browsers serve stale assets. There is no automation for this.
+Every local `js/`/`css/`/`img` asset is loaded with a `?v=<hash>` query in the HTML, where `<hash>` is the first 8 hex of the asset's content sha1. **`npm run stamp` (`tools/stamp-assets.mjs`) rewrites these from the file bytes and is part of `npm run build`** — editing an asset and rebuilding updates every page that loads it automatically; there is no manual `?v=N` to bump. `npm run check:fresh` (`tools/check-fresh.mjs`) re-runs the whole pipeline and fails if the committed `js/sheet.js`, `js/trainer.js`, or any HTML stamp is stale — wire it into CI / run it before committing. (Note: `?v=` queries embedded in CSS `url()`s, e.g. `img/logo.svg` in `css/site.css`, are not stamped — only HTML refs are.)
 
 ## Architecture
 
@@ -51,13 +55,13 @@ The **Algorithms page reads `pyraminx_algs.json` directly**; the **solver and tr
 
 ### The engine is the geometric core
 
-`js/engine.js` (`window.OOEngine`) models the full no-tips Pyraminx state space (933,120 states): state model, moves, A4 rotations + LR mirror, canonicalization, the BFS-table optimal solver, alg parsing/notation, and the **keying + alg→case helpers** (`stateKey`, `realCanonKey`, `caseStateOf`, `algSolvesKey`, `normAlg`, …). State is `{ e:[piece,flip]×6, c:[L,R,B] twists, u: U twist }`. Render keys are edges + U-twist (`stateKey|uTwist`); center twists are tip-fixable and excluded from keys. The other layers are `render.js` (SVG net/3D diagrams, `window.OORender`), `account.js` (Firebase auth + per-user data, `window.OOAccount`), `navbar.js`, and `config.js`.
+`js/engine.js` (`window.OOEngine`) models the full no-tips Pyraminx state space (933,120 states): state model, moves, A4 rotations + LR mirror, canonicalization, the BFS-table optimal solver, alg parsing/notation, and the **keying + alg→case helpers** (`stateKey`, `realCanonKey`, `caseStateOf`, `algSolvesKey`, `normAlg`, …). State is `{ e:[piece,flip]×6, c:[L,R,B] twists, u: U twist }`. Render keys are edges + U-twist (`stateKey|uTwist`); center twists are tip-fixable and excluded from keys. The other layers are `render.js` (SVG net/3D diagrams, `window.OORender`), `account.js` (Firebase auth + per-user data, `window.OOAccount`), `navbar.js`, `config.js`, and `tables.js` (`window.OOTables`) — the shared IndexedDB cache + BFS dist/class-table builder that **both** `oo.js` (census) and `solver.js` use, with separate cache keys (`oo-dist-v1` for the shared distance table, `oo-classes-v1` for the census's canonical-class tables) so the two value shapes can't collide. Load order on those pages is `engine.js` → `tables.js` → page script.
 
 The keying helpers are genuinely shared now: the **Algorithms page and the trainer alias them off `window.OOEngine`** (`stateKey`, `applyMoveK`, `rotateFrame`, `realCanonKey`, `openOfEkey`, `barOfEkey`) rather than carrying copies — so a change to move geometry or canonicalization in engine.js reaches every surface. (trainer.html loads `js/engine.js` before the bundle, so `window.OOEngine` exists at trainer eval.) What legitimately stays local to the trainer is its **BFS coordinate system** (`stateIndex`/`unindex` over `720·64·27`, its no-`|twist` `keyToState`, and `aufCanonKey`) — these aren't keying and aren't exported by the engine. The free-slot state enumeration is now shared too: both `js/solver-core.js` (`const pool = E.enumFreeSlots`) and the trainer (`src/trainer/l5e-trainer.jsx`: `const enumerateSpace = E.enumFreeSlots`) alias `E.enumFreeSlots` (which itself reuses the engine's `permsOf`/`permParity`) rather than carrying their own perm/parity copies.
 
 ### The sheet compiler's carry-forward (now hermetic)
 
-`tools/compile-sheet.mjs` carries forward case names / alg presentations the current JSON doesn't reproduce (≈15 cases / 80 alg keys). Its carry-forward baseline is a **committed snapshot, `data/prior-sheet.json`** (`const OLD = require('data/prior-sheet.json')`) — *not* the compiler's own output — so the sheet is reproducible from version-controlled inputs alone: deleting/regenerating `js/sheet.js` no longer drops those cases. (`js/sheet.js` is still read as a write-template to preserve its surrounding code.) Re-baseline by overwriting `data/prior-sheet.json` with a freshly built sheet. The compiler self-checks every emitted alg (geometry self-consistency only — a real authored-vs-solved mismatch is surfaced as an `ADVISORY`, not a failure) and refuses to write a sheet that fails; a *new* unparseable alg now fails the build (two known-broken `X2` entries are allowlisted). `tools/check-sheet.mjs` re-validates the shipped sheet but shares the engine's keying functions, so it is not independent of engine-level keying bugs.
+`tools/compile-sheet.mjs` carries forward case names / alg presentations the current JSON doesn't reproduce (≈15 cases / 80 alg keys). Its carry-forward baseline is a **committed snapshot, `data/prior-sheet.json`** (`const OLD = require('data/prior-sheet.json')`) — *not* the compiler's own output — so the sheet is reproducible from version-controlled inputs alone: deleting/regenerating `js/sheet.js` no longer drops those cases. (`js/sheet.js` is still read as a write-template to preserve its surrounding code.) Re-baseline by overwriting `data/prior-sheet.json` with a freshly built sheet. The compiler self-checks every emitted alg (geometry self-consistency only — a real authored-vs-solved mismatch is surfaced as an `ADVISORY`, not a failure) and refuses to write a sheet that fails; a *new* unparseable alg fails the build. The small set of carried-forward setup algs that parse but don't solve their key is an **explicit allowlist, `data/broken-algs.json`** (an array of `{renderKey, algorithm, reason}`, read by both the compiler and `check-sheet.mjs`) — not a count. A non-solving alg that isn't in that manifest fails both tools (they print `UNEXPECTED BROKEN`/`BROKEN` with the offending key); a manifest entry that no longer fails is just a stale-manifest warning. `tools/check-sheet.mjs` re-validates the shipped sheet but shares the engine's keying functions, so it is not independent of engine-level keying bugs.
 
 ### Module strategy (why no `"type": "module"`)
 

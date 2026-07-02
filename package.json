@@ -6,16 +6,20 @@
   "scripts": {
     "build:sheet": "node tools/compile-sheet.mjs",
     "build:trainer": "npm run build:sheet && node build.mjs",
-    "build": "npm run build:trainer && npm run check",
+    "build": "npm run build:trainer && npm run stamp && npm run check",
     "watch:trainer": "node build.mjs --watch",
+    "stamp": "node tools/stamp-assets.mjs",
     "check": "node tools/check-sheet.mjs",
-    "test": "node tools/check-sheet.mjs"
+    "check:fresh": "node tools/check-fresh.mjs",
+    "test": "node tools/check-sheet.mjs",
+    "test:engine": "node tools/test-engine.mjs",
+    "test:rules": "node test/firestore.rules.test.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
-    "esbuild": "^0.21.5"
+    "esbuild": "^0.25.12"
   }
 }

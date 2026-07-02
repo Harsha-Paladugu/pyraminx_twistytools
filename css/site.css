@@ -3,7 +3,7 @@
 :root{
   --ink:#0e1420; --ink2:#141c2c; --panel:#19222f; --panel2:#1f2a3a;
   --line:rgba(174,190,214,.14); --line2:rgba(174,190,214,.26);
-  --txt:#e8edf6; --mut:#9fadc4; --dim:#6c7a92;
+  --txt:#e8edf6; --mut:#9fadc4; --dim:#6c7a92; --paper:var(--txt);
   --green:#3fbf52; --red:#e8473d; --blue:#3a7fe8; --yellow:#f2cf3c;
   --act:#f2cf3c; --actink:#231c05;
   --disp:'Bricolage Grotesque',system-ui,sans-serif;
