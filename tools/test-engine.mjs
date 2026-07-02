@@ -114,6 +114,16 @@ test('algSolvesKey: empty alg solves the solved key; junk does not', () => {
   assert.strictEqual(E.algSolvesKey('R X', solvedKey), false);  // unparseable
 });
 
+// ---- prependAUF (shared pre-AUF folding) ----
+test('prependAUF: folds into a leading U turn', () => {
+  assert.strictEqual(E.prependAUF(1, "U R L'"), "U' R L'");   // U + U = U2 = U'
+  assert.strictEqual(E.prependAUF(2, 'U R'), 'R');            // U' + U cancels
+});
+test('prependAUF: p=0 is a no-op; bare prepend otherwise', () => {
+  assert.strictEqual(E.prependAUF(0, "R U R'"), "R U R'");
+  assert.strictEqual(E.prependAUF(2, "R U R'"), "U' R U R'");
+});
+
 // ---- canonicalization (realCanonKey) ----
 function scrambledEdges() {
   // edges-only keying state (the coordinate realCanonKey operates on)

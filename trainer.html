@@ -21,7 +21,7 @@
 <script>new SiteNavbar({ active: 'trainer' }).mount(document.body);</script>
 <div id="root"></div>
 <!-- Shared puzzle renderer (same code the rest of the site uses for diagrams). -->
-<script src="js/engine.js?v=dbcfce3c"></script>
+<script src="js/engine.js?v=6944c3e9"></script>
 <script src="js/render.js?v=096c0da8"></script>
 <script>
 /* Trainer storage bridge.
@@ -68,7 +68,7 @@
   function boot() {
     if (booted) return; booted = true; bootUid = curUid();
     var s = document.createElement('script');
-    s.src = 'js/trainer.js?v=640e15b8';
+    s.src = 'js/trainer.js?v=9e315ed9';
     document.body.appendChild(s);
   }
   if (A && A.whenReady) {

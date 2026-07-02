@@ -35,7 +35,7 @@
   const { h } = window.OODom;
 
   // ---------- engine keying / canonicalization (single source: js/engine.js) ----------
-  const { stateKey, realCanonKey, caseStateOf, applyMoveK, openOfEkey, barOfEkey } = E;
+  const { stateKey, realCanonKey, caseStateOf, applyMoveK, openOfEkey, barOfEkey, prependAUF } = E;
   // Slot-family subsets group by open slot; L5E groups by bar. The only live
   // slot-family keys are the merged 'L4E' and the TL4E +/- split keys (TL4E-B+,
   // TL4E-R-, …), which the regex catches.
@@ -55,23 +55,13 @@
   // that group's diagram: post-AUF (trailing U turns) is stripped, then a pre-AUF
   // is prepended so the alg solves the image's starting position. The pre-AUF is
   // an AUF rotation, so it merges with any leading U the alg already has.
-  const U_AMT = { U: 1, "U'": 2, U2: 2, "U2'": 1 }; // U quarter-turns mod 3
   const isU = (t) => /^U(2'|2|')?$/.test(t);
   function stripPostAUF(alg) {
     const toks = String(alg).trim().split(/\s+/).filter(Boolean);
     while (toks.length && isU(toks[toks.length - 1])) toks.pop();
     return toks.join(' ');
   }
-  // prepend `p` U quarter-turns (0/1/2, CW), folding into a leading U if present.
-  function prependAUF(p, alg) {
-    p = ((p % 3) + 3) % 3;
-    const toks = String(alg).trim().split(/\s+/).filter(Boolean);
-    const lead = toks.length && U_AMT[toks[0]] != null ? U_AMT[toks[0]] : 0;
-    const v = (p + lead) % 3;
-    const tok = v === 0 ? '' : v === 1 ? 'U' : "U'";
-    if (lead) { if (v === 0) toks.shift(); else toks[0] = tok; return toks.join(' '); }
-    return tok ? (tok + (toks.length ? ' ' + toks.join(' ') : '')) : toks.join(' ');
-  }
+  // pre-AUF folding (prepend p U quarter-turns) is the shared engine.prependAUF.
   // U quarter-turns (0/1/2) that rotate `from`'s EDGES onto `to`'s edges, or null
   // if no AUF lines them up. We compare edges only and ignore the U-twist: the
   // ending top-corner orientation is the post-AUF, which is free and not part of

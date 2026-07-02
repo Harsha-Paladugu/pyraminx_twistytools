@@ -295,10 +295,8 @@ function composeSym(a, b) { // apply b then a
 // mirror a solution string token-by-token (LR mirror): R<->L, U->U', B->B', primes flip; rotations/wides likewise
 function mirrorToken(t) {
   const map = { U:'U', B:'B', R:'L', L:'R', u:'u', b:'b', r:'l', l:'r' };
-  // CW turns the modifier denotes (matches amtOf): none/2' = 1, ' / 2 = 2.
-  const cw = mod => (mod === "'" || mod === '2') ? 2 : 1;
-  // mirror reverses direction: 1 CW -> output prime (2 CW), 2 CW -> output bare.
-  const out = mod => cw(mod) === 1 ? "'" : '';
+  // mirror reverses direction: 1 CW (amtOf) -> output prime (2 CW), 2 CW -> bare.
+  const out = mod => amtOf(mod) === 1 ? "'" : '';
   let m;
   if ((m = t.match(/^\[([ulrb])(2'|2|')?\]$/))) return '[' + map[m[1]] + out(m[2]) + ']';
   if ((m = t.match(/^(y)(2'|2|')?$/)))          return 'y' + out(m[2]);
@@ -431,6 +429,19 @@ function normAlg(alg) {
   }
   return out.join(' ');
 }
+// prepend `p` CW U quarter-turns (any integer; taken mod 3) to an alg string,
+// folding into an existing leading U-family token (U / U' / U2 / U2'). Shared
+// by the algorithms page and the trainer (was duplicated in both).
+const U_QT = { U: 1, "U'": 2, U2: 2, "U2'": 1 }; // leading token -> CW quarter-turns mod 3
+function prependAUF(p, alg) {
+  p = ((p % 3) + 3) % 3;
+  const toks = String(alg).trim().split(/\s+/).filter(Boolean);
+  const lead = toks.length && U_QT[toks[0]] != null ? U_QT[toks[0]] : 0;
+  const v = (p + lead) % 3;
+  const tok = v === 0 ? '' : v === 1 ? 'U' : "U'";
+  if (lead) { if (v === 0) toks.shift(); else toks[0] = tok; return toks.join(' '); }
+  return tok ? (tok + (toks.length ? ' ' + toks.join(' ') : '')) : toks.join(' ');
+}
 // does an alg solve the given render key, up to a whole-puzzle rotation?
 function algSolvesKey(algStr, renderKey) {
   _keyEnsure();
@@ -449,7 +460,7 @@ module.exports = {
   // keying + alg→case (single source of truth; see section above)
   stateKey, applyMoveK, rotateFrame, realCanonKey, keyToState,
   openOfEkey, barOfEkey, permsOf, permParity, enumFreeSlots,
-  preprocessAlg, inverseState, caseStateOf, algSolvesKey, normAlg,
+  preprocessAlg, inverseState, caseStateOf, algSolvesKey, normAlg, prependAUF,
 };
 
 window.OOEngine=module.exports;})();

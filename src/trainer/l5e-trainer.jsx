@@ -374,7 +374,7 @@ const shuffled = (a) => {
 const STORE_KEY = "l5e-trainer-v2";
 // Per-case selection is keyed by case NAME (one entry per named case), since a
 // named case spans several canonical states (mirror/rotation/AUF variants).
-const CASE_SEP = "";
+const CASE_SEP = "\u001f"; // ASCII Unit Separator — as an escape, NOT a raw byte (it renders invisibly)
 
 // Solution Trainer goal types: the user picks any combination and the trainer
 // solves to the UNION of the selected goals. Order here is the display order
@@ -429,17 +429,10 @@ const lookupName = (render, uTwist, caseKey) => {
 };
 // Prepend an AUF move to an alg (merging with a leading U turn), so an alg that
 // solves a U-rotation of the shown state instead solves the shown state itself.
+// The folding itself is the shared engine.prependAUF (same code the algorithms
+// page uses); this wrapper just maps the AUF token to quarter-turns.
 const U_AMT = { U: 1, "U'": 2, U2: 2, "U2'": 1 };
-function withAUF(auf, alg) {
-  if (!auf) return alg;
-  const toks = alg.split(" ");
-  if (U_AMT[toks[0]] != null) {                       // fold into the leading U turn
-    const v = (U_AMT[auf] + U_AMT[toks[0]]) % 3;
-    if (v === 0) toks.shift(); else toks[0] = v === 1 ? "U" : "U'";
-    return toks.join(" ");
-  }
-  return auf + " " + alg;
-}
+const withAUF = (auf, alg) => (auf ? E.prependAUF(U_AMT[auf], alg) : alg);
 // Every alg that solves the shown scramble at the shown angle. AUF is accounted
 // for: algs stored at a U-rotation of this exact state are included with the
 // matching AUF folded in, so each listed alg solves the scramble as displayed.
