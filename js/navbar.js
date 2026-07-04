@@ -1,12 +1,12 @@
 /* Pyraminx.net — shared navigation bar.
  *
- * The primary row is the same on every page: wordmark + the four site
+ * The primary row is the same on every page: wordmark + the site
  * sections. A page can supply sub-options that render in a second row
  * underneath, and an optional element (e.g. an auth box) for the right side.
  *
  * Usage:
  *   const bar = new SiteNavbar({
- *     active: 'oo',                                   // 'home' | 'oo' | 'solver' | 'trainer' | 'algs'
+ *     active: 'oo',                                   // 'home' | 'oo' | 'solver' | 'trainer' | 'algs' | 'about'
  *     sub: [{ label: 'Solutions', href: '#/', on: true }], // optional second row
  *     right: someElement,                             // optional right-side slot
  *   });
@@ -22,6 +22,7 @@
     { id: 'solver',  label: 'Solver',  href: 'solver.html' },
     { id: 'trainer', label: 'Trainer', href: 'trainer.html' },
     { id: 'algs',    label: 'Algorithms', href: 'algs.html' },
+    { id: 'about',   label: 'About',   href: 'about.html' },
   ];
 
   // Deliberately self-contained mini-hyperscript (subset of js/dom.js `h`): the

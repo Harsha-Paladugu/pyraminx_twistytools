@@ -8,6 +8,7 @@
 .wordmarkbig{font-family:var(--disp);font-weight:800;font-size:clamp(34px,6vw,56px);letter-spacing:.02em;margin:14px 0 0;line-height:1}
 .wordmarkbig b{color:var(--yellow);font-weight:800}
 .tagline{color:var(--mut);font-size:clamp(15px,2.2vw,18px);margin:10px 0 0;max-width:34ch}
+.herosub{color:var(--mut);font-size:15px;line-height:1.55;max-width:58ch;margin:14px 0 0}
 @keyframes herofloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
 @media(prefers-reduced-motion:reduce){.herologo{animation:none}}
 
@@ -25,6 +26,7 @@
 .toolcard p{color:var(--mut);margin:0;font-size:14px;line-height:1.45;flex:1}
 .toolcard .go{color:var(--yellow);font-weight:600;font-size:13.5px;margin-top:2px}
 
-/* ---- fact line ---- */
+/* ---- start-here + fact line ---- */
+.startline{color:var(--mut);font-size:14.5px;line-height:1.55;max-width:64ch;margin:0 auto 16px;text-align:center}
 .factline{color:var(--dim);font-size:13.5px;margin:0;text-align:center}
 .factline code{color:var(--mut)}

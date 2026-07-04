@@ -605,7 +605,8 @@
     main = h('div', { class: 'algmain' });
     app.appendChild(h('div', { class: 'algwrap' },
       h('div', { class: 'alghead' }, h('h1', null, 'Algorithms'),
-        h('p', { class: 'sub' }, 'Pick L4E, TL4E or L5E, then a subset. Use search to find a case fast.')),
+        h('p', { class: 'sub' }, 'Pick L4E, TL4E or L5E, then a subset. Use search to find a case fast.'),
+        h('p', { class: 'sub' }, 'This is the full algorithm sheet behind the solver and the trainer. The tabs are the three last-step systems used in V-First solving. L4E solves the last four edges once you’ve built a V. TL4E covers the same cases when a center is still twisted. L5E solves the last five edges from a smaller starting block. If you don’t know where to begin, start with plain L4E. Inside a tab, the sidebar lists subsets, which are just groups of related cases. Each case shows a diagram of the puzzle the way you’d hold it, next to the algorithms that solve it. Every algorithm here is checked by the site’s engine before it goes up, so there are no typos to worry about.')),
       tabs, toolbar,
       h('div', { class: 'algcols' }, h('aside', { class: 'algsidewrap' }, sideNav), main)));
 

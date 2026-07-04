@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pyraminx.net · About</title>
+<meta name="description" content="Who runs Pyraminx.net and why, plus links to more Pyraminx resources.">
+<link rel="canonical" href="https://pyraminx.net/about.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Pyraminx.net">
+<meta property="og:title" content="About Pyraminx.net">
+<meta property="og:description" content="Who runs Pyraminx.net and why, plus links to more Pyraminx resources.">
+<meta property="og:url" content="https://pyraminx.net/about.html">
+<meta property="og:image" content="https://pyraminx.net/img/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#0e1420">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300..800&family=Instrument+Sans:wght@400;500;600&family=Spline+Sans+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="icon" href="img/logo.svg?v=5b08bb0a" type="image/svg+xml">
+<link rel="apple-touch-icon" href="img/apple-touch-icon.png?v=e94eb1b7">
+<link rel="stylesheet" href="css/site.css?v=e9f9c40e">
+<style>
+/* page-local: stacked prose cards + the captioned banner figure */
+.page.about .card{margin-bottom:16px}
+.page.about .prose p+p{margin-top:9px}
+.page.about .prose li{color:var(--mut);font-size:15px;max-width:72ch;margin:7px 0}
+.page.about .prose ul{margin:8px 0 0;padding-left:22px}
+.aboutfig{margin:0 0 16px}
+.aboutfig img{display:block;width:100%;max-width:640px;height:auto;border:1px solid var(--line);border-radius:14px}
+.aboutfig figcaption{color:var(--dim);font-size:13.5px;margin-top:8px;max-width:72ch}
+</style>
+</head>
+<body>
+<script src="js/config.js?v=8f226c72"></script>
+<script src="js/account.js?v=174f1397"></script>
+<script src="js/navbar.js?v=1dde4c5c"></script>
+<script>new SiteNavbar({ active: 'about' }).mount(document.body);</script>
+<main class="page about">
+  <section class="homeintro">
+    <h1>About this site</h1>
+    <p class="lede">Pyraminx.net collects everything you need to solve the Pyraminx: a census of best solutions, a method solver, a case trainer, and a full algorithm sheet. All of it is free, and all of it is checked by computer.</p>
+  </section>
+
+  <section class="card prose">
+    <h2>Who runs this</h2>
+    <p>Hi, I&rsquo;m Harsha Paladugu. I&rsquo;ve been cubing for 13 years, and Pyraminx is my event. I&rsquo;m a former US national record holder for Pyraminx single at 1.31, a former North American record holder at 0.98, and I placed 2nd at the Rubik&rsquo;s WCA North American Championship 2022. I also invented three of the systems this site teaches: ML4E, TL4E, and L5E.</p>
+    <p>I built every tool here myself: the engine that models all 933,120 positions, the solver, the trainer, the algorithm sheet, and the OO census, which collects the community&rsquo;s best human solution to every position. The engine checks every algorithm and solution before it reaches the page, so you never have to wonder whether an alg has a typo in it.</p>
+    <figure class="aboutfig">
+      <img src="img/og.png?v=8e45bc2e" width="1200" height="630" alt="The Pyraminx.net banner: a V-shaped logo built from red, green, blue and yellow triangles beside the site name and the tagline 'Everything you need to solve the Pyraminx.'" decoding="async">
+      <figcaption>The site banner. The V is for V-First, the shape every method on this site starts by building.</figcaption>
+    </figure>
+  </section>
+
+  <section class="card prose">
+    <h3>Why this site exists</h3>
+    <p>Pyraminx.net started as a set of written solving instructions I put together for new solvers. The problem with instructions on paper is that they pick one path through the puzzle and everyone has to follow it. A website doesn&rsquo;t have that limit. If you&rsquo;re new, paste any scramble into the <a href="solver.html">solver</a> and you&rsquo;ll get solutions you can actually find at the table. If you&rsquo;re working on speed, drill the cases that slow you down in the <a href="trainer.html">trainer</a>. And if you want a long-term project, browse the <a href="oo.html">OO census</a> and claim a position nobody has solved yet. Each page explains itself, so it&rsquo;s fine to land anywhere on the site and just start there.</p>
+  </section>
+
+  <section class="card prose">
+    <h3>Resources and further reading</h3>
+    <p>This site sticks to Pyraminx solving. For the wider picture, these are the places I&rsquo;d send you:</p>
+    <ul>
+      <li><a href="https://www.worldcubeassociation.org/" rel="noopener">World Cube Association</a>: the group that runs official speedcubing competitions. Pyraminx is an official event, and this is where records and rankings live.</li>
+      <li><a href="https://www.speedsolving.com/wiki/index.php/Pyraminx" rel="noopener">Pyraminx on the Speedsolving Wiki</a>: community pages on the puzzle&rsquo;s methods, terminology, and history.</li>
+      <li><a href="https://www.jaapsch.net/puzzles/pyraminx.htm" rel="noopener">Jaap&rsquo;s Puzzle Page on the Pyraminx</a>: the math behind the puzzle, including the numbers this site is built on. There are exactly 933,120 positions, and every one can be solved in 11 moves or fewer.</li>
+    </ul>
+  </section>
+
+  <section class="card prose">
+    <h3>Content and copyright</h3>
+    <p>I wrote all the text on this site, and every image (the logo, the banner above, the puzzle diagrams) is either mine or drawn by the site&rsquo;s own code. Nothing here is copied from anyone else&rsquo;s work, and the links above just point you to the original sites. If you spot an error, or you&rsquo;d like to help review solutions for the census, the <a href="oo.html#/about">How it works</a> page explains how to get involved.</p>
+  </section>
+</main>
+</body>
+</html>

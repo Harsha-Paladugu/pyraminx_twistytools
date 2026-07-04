@@ -77,7 +77,7 @@ function verifySolution(text, pair) {
   // (e.g. R R') would mark it done a second time — pageHome already counts
   // depth-0 as solved by definition. Also disables Approve for any legacy
   // pending depth-0 submission in the moderation queue.
-  if (pair.a.depth === 0) return { ok: false, error: 'This is the solved position — there’s nothing to solve.' };
+  if (pair.a.depth === 0) return { ok: false, error: 'This is the solved position. There’s nothing to solve.' };
   const parsed = E.parseAlg(text);
   if (!parsed) return { ok: false, error: 'We couldn\u2019t read that. Use U L R B (with w, \u2032 or 2) and rotations [u] [l] [r] [b] or y. Tips are ignored.' };
   const moves = E.countMoves(parsed);
@@ -399,7 +399,7 @@ function requestModBlock() {
   const url = moderatorFormUrl();
   return url
     ? h('button', { class: 'primary', onclick: () => window.open(url, '_blank', 'noopener') }, 'Request moderator access')
-    : h('p', { class: 'empty' }, 'Moderator applications aren’t open yet — check back soon.');
+    : h('p', { class: 'empty' }, 'Moderator applications aren’t open yet. Check back soon.');
 }
 function sidePanel(side, label, doneSet, exactView) {
   const shownState = exactView && exactView.state ? exactView.state : side.state;
@@ -556,12 +556,12 @@ async function pageClass(main, anyId) {
   const sub = h('section', { class: 'card subcard' }, h('h3', null, 'Submit a solution'));
   if (pair.a.depth === 0) {
     // the solved position — counted as done by definition, nothing to submit
-    sub.appendChild(h('p', { class: 'empty' }, 'This is the solved position — there’s nothing to solve, so it doesn’t take solutions.'));
+    sub.appendChild(h('p', { class: 'empty' }, 'This is the solved position. There’s nothing to solve, so it doesn’t take solutions.'));
   } else if (approved.length >= MAX_SOLUTIONS) {
     // Every scramble keeps at most MAX_SOLUTIONS solutions — this one is full.
-    sub.appendChild(h('p', { class: 'empty' }, 'This scramble already has ' + MAX_SOLUTIONS + ' solutions — the maximum. Thanks for looking!'));
+    sub.appendChild(h('p', { class: 'empty' }, 'This scramble already has ' + MAX_SOLUTIONS + ' solutions, the maximum it keeps. Thanks for looking!'));
   } else if (!DB.user) {
-    sub.appendChild(h('p', null, 'You can browse everything without an account. Submitting solutions is limited to moderators — sign in with Google to get started.'));
+    sub.appendChild(h('p', null, 'You can browse everything without an account. Submitting solutions is limited to moderators. Sign in with Google to get started.'));
     sub.appendChild(h('button', { class: 'primary', onclick: () => DB.signIn().catch(() => toast('Sign-in didn’t go through. Please try again.')) }, 'Sign in with Google'));
   } else if (!DB.isMod) {
     sub.appendChild(h('p', null, 'Only moderators can submit solutions. If you’d like to help build the collection, you can apply to become one.'));
@@ -725,7 +725,7 @@ async function pageMod(main) {
 function pageAbout(main) {
   main.appendChild(h('section', { class: 'card prose' },
     h('h2', null, 'How OO solutions work'),
-    h('p', null, 'Ignoring the tips, the Pyraminx has exactly 933,120 positions, and every one can be solved in 11 moves or fewer. That part is proven by computer. What a computer can\u2019t tell you is which short solution feels best in your hands. This page collects the community\u2019s pick, one position at a time.'),
+    h('p', null, 'The Pyraminx has exactly 933,120 positions, and every one can be solved in 11 moves or fewer. That part is proven by computer. What a computer can\u2019t tell you is which short solution feels best in your hands. This page collects the community\u2019s pick, one position at a time.'),
     h('h3', null, 'Positions, rotations and mirrors'),
     h('p', null, 'Rotating the whole puzzle doesn\u2019t change the solve, so those 933,120 states come down to ' + fmt(T.reps.length) + ' positions. Each one covers up to 12 rotations, which you can flip through on any position page. A position and its mirror are different solves with mirrored algorithms, so they\u2019re shown side by side. Submit either one and we generate the mirrored version for you. One approved solution marks both as done.'),
     h('h3', null, 'Notation'),
@@ -737,7 +737,7 @@ function pageAbout(main) {
     h('h3', null, 'Submitting and review'),
     h('p', null, 'Submitting solutions is limited to moderators. Solutions can be up to 15 moves and are checked automatically: they have to really solve the scramble, from any rotation, on either mirror. A moderator then reviews each one before it goes live, and we check it again at that point. Each scramble keeps at most ' + MAX_SOLUTIONS + ' solutions, so once two are approved that position is settled.'),
     h('h3', null, 'Becoming a moderator'),
-    h('p', null, 'Want to help build the collection? Anyone can apply to become a moderator \u2014 moderators are the ones who submit and review solutions.'),
+    h('p', null, 'Want to help build the collection? Anyone can apply to become a moderator. Moderators are the ones who submit and review solutions.'),
     requestModBlock(),
     h('h3', null, 'Privacy'),
     h('p', null, 'Anyone can browse without an account. Your name shows up on a solution only if you leave \u201cshow my name\u201d checked.')));

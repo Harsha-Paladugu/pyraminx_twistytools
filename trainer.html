@@ -21,17 +21,24 @@
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300..800&family=Instrument+Sans:wght@400;500;600&family=Spline+Sans+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="icon" href="img/logo.svg?v=5b08bb0a" type="image/svg+xml">
 <link rel="apple-touch-icon" href="img/apple-touch-icon.png?v=e94eb1b7">
-<link rel="stylesheet" href="css/site.css?v=01186406">
+<link rel="stylesheet" href="css/site.css?v=e9f9c40e">
 <link rel="stylesheet" href="css/trainer.css?v=63b1dc7a">
 </head>
 <body>
 <!-- Shared account layer (site-wide sign in), then the navbar (which auto-mounts
      the sign-in control). -->
 <script src="js/config.js?v=8f226c72"></script>
-<script src="js/account.js?v=c86dc250"></script>
-<script src="js/navbar.js?v=bfd56818"></script>
+<script src="js/account.js?v=174f1397"></script>
+<script src="js/navbar.js?v=1dde4c5c"></script>
 <script>new SiteNavbar({ active: 'trainer' }).mount(document.body);</script>
 <div id="root"></div>
+<!-- Static page prose (below the app): what the trainer is and how to use it. -->
+<section class="page">
+  <div class="card prose">
+    <h3>How to practice here</h3>
+    <p>The trainer is how you actually learn the <a href="algs.html">algorithm sheet</a>. Pick the cases you want to work on, and every scramble it deals will land in one of them. That way you&rsquo;re always practicing something you chose, not whatever happens to come up. Drill mode feeds you cases with a timer. Recap mode goes through every case you&rsquo;ve enabled exactly once, which is a good way to find out what has stuck. There are also modes for case recognition and for reading full solutions. If a case keeps beating you, look it up on the <a href="algs.html">Algorithms</a> sheet, or paste a scramble into the <a href="solver.html">Solver</a> and compare approaches. Progress saves in this browser on its own, and if you sign in at the top right it follows you to other devices.</p>
+  </div>
+</section>
 <!-- Shared puzzle renderer (same code the rest of the site uses for diagrams). -->
 <script src="js/engine.js?v=6944c3e9"></script>
 <script src="js/render.js?v=096c0da8"></script>

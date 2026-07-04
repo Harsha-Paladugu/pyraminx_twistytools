@@ -124,7 +124,7 @@
       if (state.mode === 'demo') {
         const badge = document.createElement('span');
         badge.className = 'demobadge';
-        badge.title = 'No Firebase config — data stays in this browser';
+        badge.title = 'No Firebase config. Data stays in this browser';
         badge.textContent = 'demo mode';
         box.appendChild(badge);
       }

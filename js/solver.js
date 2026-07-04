@@ -247,7 +247,8 @@ function renderInner() {
 
   main.appendChild(h('section', { class: 'homeintro' },
     h('h1', null, 'Method solver'),
-    h('p', { class: 'lede' }, 'Paste a scramble and get solutions you can actually find at the table: V into L4E, ML4E, L5E and more, ranked by how comfortable they are to turn. Every solution is checked by the computer.')));
+    h('p', { class: 'lede' }, 'Paste a scramble and get solutions you can actually find at the table: V into L4E, ML4E, L5E and more, ranked by how comfortable they are to turn. Every solution is checked by the computer.'),
+    h('p', { class: 'lede sm' }, 'Type or paste a scramble into the box and press Solve. The chips under the box choose which methods to search. Each result is split into its steps, and the number on the right is its comfort score. Lower is better: the score looks at how each move flows into the next, so it favors solutions that are nice to turn. Open “score” on any row to see how a score breaks down, and if the ranking doesn’t match your hands, adjust the weights in the options drawer.')));
 
   /* scramble row */
   main.appendChild(h('div', { class: 'searchrow' },
@@ -297,7 +298,7 @@ function renderInner() {
       h('div', { class: 'optcol' },
         h('h4', null, 'Comfort (re-ranks instantly)'),
         h('p', { class: 'opthint' }, 'Each move adds a small cost, and the score is the total, so lower means nicer to turn. Raise a slider if something bugs you more than the default.'),
-        slider('B move', 'any B, compared with a wrist turn \u2014 the index has to reach over the top', 'bBase', 1, 4, 0.05),
+        slider('B move', 'any B, compared with a wrist turn. The index has to reach over the top', 'bBase', 1, 4, 0.05),
         slider('cold B extra', 'added on top of a B when no freshly raised thumb is waiting for it, like the B in L U \u2026 B', 'bColdExtra', 0, 4, 0.1),
         slider('wide move', 'an Rw or Lw, compared with a normal turn (1.0 means no penalty)', 'wide', 0.5, 5, 0.05),
         slider('lingering thumb', 'each move a thumb stays off home after the move that raised it, so quick returns like R U R\u2032 stay cheap but parking a thumb does not', 'excursion', 0, 1, 0.05),

@@ -58,6 +58,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{
 .homeintro h1{font-family:var(--disp);font-weight:700;font-size:clamp(24px,3.4vw,32px);line-height:1.18;margin:0 0 12px;letter-spacing:-.005em}
 .lede{color:var(--mut);margin:0;max-width:58ch}
 .lede.sm{font-size:14.5px}
+.homeintro .lede+.lede{margin-top:10px}
 .progressblock{margin:0 0 26px;max-width:640px}
 .progressline{color:var(--mut);font-size:14px;margin:9px 0 0}
 .progressline b{color:var(--txt);font-weight:600}

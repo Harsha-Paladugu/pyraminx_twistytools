@@ -155,7 +155,7 @@ function makeSolverCore(E, dist) {
       const p = E.solved();
       for (const m of ms) E.applyMoveIdx(p, m);
       if (new Set(syms.rots.map(sy => E.idx(E.applySym(sy, p)))).size !== 12)
-        throw new Error('rotation probe is symmetric — choose a different probe scramble');
+        throw new Error('rotation probe is symmetric; choose a different probe scramble');
       return p;
     });
     const out = [];
