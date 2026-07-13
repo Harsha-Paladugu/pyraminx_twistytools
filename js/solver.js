@@ -103,7 +103,10 @@ function migrateWeights(w) {
 function snapshotPrefs() { const o = {}; for (const k of PREF_KEYS) o[k] = UI[k]; return o; }
 function applyPrefs(p) {
   if (!p || typeof p !== 'object') return;
-  for (const k of PREF_KEYS) if (p[k] !== undefined && p[k] !== null) UI[k] = p[k];
+  // saved docs come over the network — only accept fields of the expected type,
+  // so a malformed doc can't wedge the UI (e.g. a non-string offsetsText)
+  const PREF_TYPE = { methods: 'object', caps: 'object', offsetsText: 'string', slack: 'number', maxCancel: 'number', weights: 'object' };
+  for (const k of PREF_KEYS) if (p[k] !== undefined && p[k] !== null && typeof p[k] === PREF_TYPE[k]) UI[k] = p[k];
   UI.weights = migrateWeights(UI.weights);
 }
 let _saveTimer = null;
@@ -117,7 +120,9 @@ async function loadPrefs() {
   const A = window.OOAccount;
   if (!A || !A.user) return;
   const p = await A.loadUserDoc('solver');     // cloud wins: account settings replace local
-  if (p) { applyPrefs(p); render(); }
+  // results may already be on screen (sign-in after a solve): re-score them under
+  // the loaded weights so the ranking and score chips can't go stale
+  if (p) { applyPrefs(p); if (Object.keys(UI.results).length) rescoreAll(false); else render(); }
 }
 
 function parsedOffsets() {
@@ -155,7 +160,7 @@ async function runSearch(newLengths) {
   UI.searching = false;
   render();
 }
-function rescoreAll() { // ergonomics changed: re-rank cached results, no re-search
+function rescoreAll(persist = true) { // ergonomics changed: re-rank cached results, no re-search
   for (const L of Object.keys(UI.results)) {
     for (const it of UI.results[L]) {
       const sc = C.ergoScore(it.exec, it.prefix, UI.weights);
@@ -164,7 +169,7 @@ function rescoreAll() { // ergonomics changed: re-rank cached results, no re-sea
     }
     UI.results[L].sort((a, b) => a.score - b.score || a.display.localeCompare(b.display));
   }
-  persistPrefs();
+  if (persist) persistPrefs();  // loading prefs re-scores but must not write them straight back
   render();
 }
 function fullResearch() { // structural option changed

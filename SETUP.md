@@ -43,6 +43,21 @@ Rules) if you'd rather not use the CLI. Admin access comes from the `admins/{uid
 collection (step 2) — no per-deploy uid edit needed — so deploy only once your
 own `admins/{uid}` doc exists, or admin writes lock out until you create it.
 
+## 4. One-time PII scrub of legacy solutions (run once, after deploying)
+
+The privacy hardening (no reviewer email on public docs; no stored name when a
+submitter opts out) changed WRITES only. Any solution approved *before* that change
+still carries the old data on its world-readable doc. Scrub it once with the
+admin-run helper (dry-run by default, `--apply` to write):
+
+```
+npm install --no-save firebase-admin@13.0.0
+gcloud auth application-default login      # or set GOOGLE_APPLICATION_CREDENTIALS
+node tools/scrub-legacy-pii.mjs            # preview
+node -e "const major=Number(process.versions.node.split('.')[0]); if (major < 18) { console.error('Unsupported Node.js ' + process.version + '. tools/scrub-legacy-pii.mjs requires Node.js >=18.'); process.exit(1); } console.log('Node.js ' + process.version + ' OK (>=18).');"
+node tools/scrub-legacy-pii.mjs --apply    # perform
+```
+
 > Note: the algorithm sheet no longer uses Firestore. Editing happens in
 > `data/pyraminx_algs.json` (directly or via the Algorithms page's Export), so
 > there is no `algsheet` collection or rule — see [README.md](README.md).

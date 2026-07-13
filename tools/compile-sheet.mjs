@@ -219,12 +219,22 @@ if (staleBroken.length) {
   staleBroken.forEach(k => console.warn('   STALE ' + k));
 }
 
+// ---- every failure condition, computed BEFORE the write so all of them gate it
+// (they are each reported in detail further down). A new unparseable alg or a
+// coverage regression must leave the committed sheet untouched, exactly like a
+// self-check failure — not fail the build after already overwriting it.
+// Add an entry to SKIP_ALLOW only to deliberately tolerate a known-bad alg.
+const SKIP_ALLOW = new Set([]);
+const unexpectedSkips = report.skipped.filter(s => !SKIP_ALLOW.has(s));
+const gaps = Object.keys(OLD.CNAME).filter(k => !MAIN.CNAME[k]);
+const okToWrite = selfCheckOk && !unexpectedSkips.length && !gaps.length;
+
 // ---- write js/sheet.js (replace only the SHEET data line) ----
 // Never overwrite the live data file on a failed compile — only write a sheet
-// that passed the self-check. (--check is a dry run and never writes.)
+// that passed every gate above. (--check is a dry run and never writes.)
 const SHEET_PATH = path.join(ROOT, 'js', 'sheet.js');
 const check = process.argv.includes('--check');
-if (!check && selfCheckOk) {
+if (!check && okToWrite) {
   const src = fs.readFileSync(SHEET_PATH, 'utf8');
   const lines = src.split(/\r?\n/);
   const idx = lines.findIndex(l => /^\s*const SHEET\s*=\s*\{/.test(l));
@@ -237,8 +247,11 @@ if (!check && selfCheckOk) {
       : v);
   lines[idx] = '  const SHEET = ' + sortedStringify(MAIN) + ';';
   fs.writeFileSync(SHEET_PATH, lines.join('\n'));
-} else if (!check && !selfCheckOk) {
-  console.error('NOT writing js/sheet.js — compile did not pass the self-check.');
+} else if (!check && !okToWrite) {
+  console.error('NOT writing js/sheet.js — compile failed: '
+    + [selfCheckOk ? '' : 'self-check',
+       unexpectedSkips.length ? unexpectedSkips.length + ' unparseable alg(s)' : '',
+       gaps.length ? gaps.length + ' coverage gap(s)' : ''].filter(Boolean).join(', ') + '.');
 }
 
 // ---- report ----
@@ -247,10 +260,7 @@ console.log(check ? '== compile (--check, not written) ==' : '== compiled js/she
 console.log('algs read:', report.algs, '| skipped (unparseable):', report.skipped.length);
 report.skipped.forEach(s => console.log('   SKIP', s));
 // Build hardening: a NEW unparseable alg is silent data loss from the source of
-// truth, so any skipped (unparseable) alg fails the build. Add an entry here only
-// to deliberately tolerate a known-bad alg.
-const SKIP_ALLOW = new Set([]);
-const unexpectedSkips = report.skipped.filter(s => !SKIP_ALLOW.has(s));
+// truth, so any skipped (unparseable) alg fails the build (and gated the write above).
 if (unexpectedSkips.length) {
   process.exitCode = 1;
   console.error('*** ' + unexpectedSkips.length + ' UNEXPECTED unparseable alg(s) — failing build (fix the JSON or extend parseAlg):');
@@ -273,8 +283,7 @@ if (report.misfiled.length) {
   report.misfiled.forEach(s => console.log('   MISFILED ' + s));
 }
 
-// coverage guarantee vs old
-const gaps = Object.keys(OLD.CNAME).filter(k => !MAIN.CNAME[k]);
+// coverage guarantee vs old (gaps computed above, before the write gate)
 console.log('\nself-check: every emitted alg solves its render key, except', failingBroken.length, 'allowlisted broken (' + BROKEN_KEYS.size + ' in manifest) ->',
   selfCheckOk ? 'PASS' : 'FAIL');
 console.log('COVERAGE: old CNAME keys', Object.keys(OLD.CNAME).length, '| gaps in MAIN:', gaps.length,

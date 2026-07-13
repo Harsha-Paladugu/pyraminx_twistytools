@@ -22,6 +22,7 @@
   const DB_NAME = 'pyraminx-oo', STORE = 't';
   const KEY_DIST = 'oo-dist-v1';        // { dist: ArrayBuffer }
   const KEY_CLASSES = 'oo-classes-v1';  // { reps: ArrayBuffer, depths: ArrayBuffer }
+  const GEOM_SCHEMA_VERSION = 'geom-v2';
 
   function openDB() {
     return new Promise((res, rej) => {
@@ -56,10 +57,17 @@
     } catch (e) { /* cache is best-effort */ }
   }
 
+  // Geometry/schema fingerprint for cache reuse. Bump this whenever engine
+  // geometry/state indexing/canonicalization changes so stale tables rebuild.
+  function geomFp(E) {
+    return GEOM_SCHEMA_VERSION;
+  }
+
   // BFS over the full state space -> Int8Array distance table. Cached under KEY_DIST.
   async function loadOrBuildDist(E, report, tick) {
+    const fp = geomFp(E);
     const cached = await idbGet(KEY_DIST);
-    if (cached && cached.dist) { if (report) report('cache', 1, 1); return new Int8Array(cached.dist); }
+    if (cached && cached.dist && cached.fp === fp) { if (report) report('cache', 1, 1); return new Int8Array(cached.dist); }
     const dist = new Int8Array(E.NSLOTS).fill(-1);
     let frontier = new Uint32Array([E.idx(E.solved())]);
     dist[frontier[0]] = 0;
@@ -80,15 +88,16 @@
       if (report) report('bfs', seen, 933120);
       if (tick) await tick();
     }
-    idbPut(KEY_DIST, { dist: dist.buffer });
+    idbPut(KEY_DIST, { dist: dist.buffer, fp });
     return dist;
   }
 
   // Canonical-class enumeration (requires dist) -> { reps:Uint32Array, depths:Uint8Array }.
   // Cached under KEY_CLASSES.
   async function loadOrBuildClassTables(E, dist, report, tick) {
+    const fp = geomFp(E);
     const cached = await idbGet(KEY_CLASSES);
-    if (cached && cached.reps && cached.depths) {
+    if (cached && cached.reps && cached.depths && cached.fp === fp) {
       if (report) report('cache', 1, 1);
       return { reps: new Uint32Array(cached.reps), depths: new Uint8Array(cached.depths) };
     }
@@ -102,7 +111,7 @@
     }
     const repsArr = Uint32Array.from(reps), depthsArr = Uint8Array.from(depths);
     if (report) report('classes', E.NSLOTS, E.NSLOTS);
-    idbPut(KEY_CLASSES, { reps: repsArr.buffer, depths: depthsArr.buffer });
+    idbPut(KEY_CLASSES, { reps: repsArr.buffer, depths: depthsArr.buffer, fp });
     return { reps: repsArr, depths: depthsArr };
   }
 

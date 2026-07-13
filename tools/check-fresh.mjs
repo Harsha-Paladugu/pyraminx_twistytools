@@ -16,9 +16,11 @@ import { fileURLToPath } from 'url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-// Everything a clean build (re)generates: the two compiled artifacts + stamped HTML.
+// Everything a clean build (re)generates: the two compiled artifacts + stamped
+// HTML + stamped css (url() refs inside css carry ?v= hashes too).
 const GENERATED = ['js/sheet.js', 'js/trainer.js',
-  ...fs.readdirSync(ROOT).filter(f => f.endsWith('.html'))];
+  ...fs.readdirSync(ROOT).filter(f => f.endsWith('.html')),
+  ...fs.readdirSync(path.join(ROOT, 'css')).filter(f => f.endsWith('.css')).map(f => 'css/' + f)];
 
 const snapshot = new Map(GENERATED.map(rel => [rel, fs.readFileSync(path.join(ROOT, rel))]));
 

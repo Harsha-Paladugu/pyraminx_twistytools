@@ -3,6 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- CSP (meta form: no frame-ancestors/report-only here). Allowlist mirrors what the site loads:
+     gstatic = Firebase SDK dynamic imports (js/account.js), googleapis = Auth + Firestore,
+     firebaseapp.com = the auth popup/iframe helper (must match authDomain in js/config.js). -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com; frame-src https://pyraminx-oo.firebaseapp.com https://accounts.google.com; object-src 'none'; base-uri 'self'">
 <title>Pyraminx.net · OO solutions</title>
 <meta name="description" content="The best human solution for every Pyraminx position, one solve at a time.">
 <link rel="canonical" href="https://pyraminx.net/oo.html">
@@ -21,7 +25,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300..800&family=Instrument+Sans:wght@400;500;600&family=Spline+Sans+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="icon" href="img/logo.svg?v=5b08bb0a" type="image/svg+xml">
 <link rel="apple-touch-icon" href="img/apple-touch-icon.png?v=e94eb1b7">
-<link rel="stylesheet" href="css/site.css?v=e9f9c40e">
+<link rel="stylesheet" href="css/site.css?v=b8a9d923">
 <link rel="stylesheet" href="css/oo.css?v=5a01a009">
 <script src="js/config.js?v=8f226c72"></script>
 </head>
@@ -35,10 +39,10 @@
 <div id="app"></div>
 <script src="js/account.js?v=174f1397"></script>
 <script src="js/engine.js?v=6944c3e9"></script>
-<script src="js/tables.js?v=ba81426f"></script>
+<script src="js/tables.js?v=2bbcf046"></script>
 <script src="js/render.js?v=096c0da8"></script>
-<script src="js/navbar.js?v=1dde4c5c"></script>
+<script src="js/navbar.js?v=eea7943d"></script>
 <script src="js/dom.js?v=2fe7b1f6"></script>
-<script src="js/oo.js?v=37b969a0"></script>
+<script src="js/oo.js?v=f60d2bce"></script>
 </body>
 </html>

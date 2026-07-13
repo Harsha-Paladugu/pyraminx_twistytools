@@ -35,7 +35,7 @@ Both are committed so the site works on the host without a build. Edit the *sour
 
 ## Cache-busting discipline
 
-Every local `js/`/`css/`/`img` asset is loaded with a `?v=<hash>` query in the HTML, where `<hash>` is the first 8 hex of the asset's content sha1. **`npm run stamp` (`tools/stamp-assets.mjs`) rewrites these from the file bytes and is part of `npm run build`** — editing an asset and rebuilding updates every page that loads it automatically; there is no manual `?v=N` to bump. `npm run check:fresh` (`tools/check-fresh.mjs`) re-runs the whole pipeline and fails if the committed `js/sheet.js`, `js/trainer.js`, or any HTML stamp is stale — wire it into CI / run it before committing. (Note: `?v=` queries embedded in CSS `url()`s, e.g. `img/logo.svg` in `css/site.css`, are not stamped — only HTML refs are.)
+Every local `js/`/`css/`/`img` asset is loaded with a `?v=<hash>` query in the HTML, where `<hash>` is the first 8 hex of the asset's content sha1. **`npm run stamp` (`tools/stamp-assets.mjs`) rewrites these from the file bytes and is part of `npm run build`** — editing an asset and rebuilding updates every page that loads it automatically; there is no manual `?v=N` to bump. It stamps CSS `url()` refs too (the css pass runs before the HTML pass, so page stamps hash the settled css bytes), and it FAILS on any local asset ref that lacks a `?v=` query — give a new ref `?v=0` and re-run. `npm run check:fresh` (`tools/check-fresh.mjs`) re-runs the whole pipeline and fails if the committed `js/sheet.js`, `js/trainer.js`, or any HTML/CSS stamp is stale — wire it into CI / run it before committing.
 
 ## Architecture
 

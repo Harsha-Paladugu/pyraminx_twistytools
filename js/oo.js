@@ -160,12 +160,12 @@ function demoDB() {
       if (action === 'approved'
           && d.solutions.filter(x => x.pairId === s.pairId && x.status === 'approved').length >= MAX_SOLUTIONS)
         throw new Error('CAP');
-      s.status = action; s.reviewedBy = A.user && A.user.email;
+      s.status = action; s.reviewedBy = A.user && A.user.uid;
       save(d); notify();
     },
     async mods() { return load().mods; },
     async invite(email) { const d = load(); d.mods.push({ email, addedBy: A.user.email }); save(d); notify(); },
-    async revoke(email) { const d = load(); d.mods = d.mods.filter(m => m.email !== email); save(d); notify(); },
+    async revoke(uid, email) { const d = load(); d.mods = d.mods.filter(m => m.email !== email); save(d); notify(); },
   };
 }
 
@@ -189,9 +189,14 @@ function liveDB() {
       try { const m = await F.getDoc(F.doc(fs, 'moderators', user.uid)); isMod = m.exists(); } catch {}
       if (!isMod) { // accept an invite if one exists for this email
         try {
-          const inv = await F.getDoc(F.doc(fs, 'moderatorInvites', user.email));
+          const email = (user.email || '').toLowerCase();   // invites are keyed by lowercased email
+          const inv = await F.getDoc(F.doc(fs, 'moderatorInvites', email));
           if (inv.exists()) {
-            await F.setDoc(F.doc(fs, 'moderators', user.uid), { email: user.email, via: 'invite' });
+            await F.setDoc(F.doc(fs, 'moderators', user.uid), { email, via: 'invite' });
+            // consume the invite so it's single-use: otherwise a later admin
+            // revoke (which deletes moderators/{uid}) would be silently undone by
+            // this same code re-accepting the still-present invite on next load.
+            try { await F.deleteDoc(F.doc(fs, 'moderatorInvites', email)); } catch {}
             isMod = true;
           }
         } catch {}
@@ -245,7 +250,9 @@ function liveDB() {
     },
     async review(id, action) {
       if (action === 'rejected') {
-        await F.updateDoc(F.doc(fs, 'solutions', id), { status: 'rejected', reviewedBy: A.user.email });
+        // reviewedBy is the uid, not the email: approved docs are world-readable,
+        // and the rules bind this field to request.auth.uid.
+        await F.updateDoc(F.doc(fs, 'solutions', id), { status: 'rejected', reviewedBy: A.user.uid });
         notify(); return;
       }
       // Enforce the per-scramble cap before approving. Rules can't count sibling
@@ -282,7 +289,7 @@ function liveDB() {
         let b64 = ''; const CH = 8192;
         for (let i = 0; i < bm.length; i += CH) b64 += String.fromCharCode.apply(null, bm.subarray(i, i + CH));
         b64 = btoa(b64);
-        tx.update(solRef, { status: 'approved', reviewedBy: A.user.email });
+        tx.update(solRef, { status: 'approved', reviewedBy: A.user.uid });
         tx.set(mapRef, { b64 });
         const done = (statDoc.exists() ? statDoc.data().done || 0 : 0) + added;
         tx.set(statRef, { done, total: T.reps.length });
@@ -296,9 +303,13 @@ function liveDB() {
       return out;
     },
     async invite(email) { await F.setDoc(F.doc(fs, 'moderatorInvites', email.toLowerCase()), { addedBy: A.user.email }); notify(); },
-    async revoke(key) {
-      try { await F.deleteDoc(F.doc(fs, 'moderators', key)); } catch {}
-      try { await F.deleteDoc(F.doc(fs, 'moderatorInvites', key)); } catch {}
+    // Revoking a moderator must remove BOTH the moderators/{uid} doc and any
+    // lingering email-keyed invite, or the revoked user's client re-accepts the
+    // invite on next load. Called with (uid, email); either may be null (an
+    // uninvited-but-accepted mod has no invite; an invite row has no uid yet).
+    async revoke(uid, email) {
+      if (uid) { try { await F.deleteDoc(F.doc(fs, 'moderators', uid)); } catch {} }
+      if (email) { try { await F.deleteDoc(F.doc(fs, 'moderatorInvites', String(email).toLowerCase())); } catch {} }
       notify();
     },
   };
@@ -591,10 +602,13 @@ async function pageClass(main, anyId) {
       const partner = pair.self ? sideObj : (v.side === 'a' ? (pair.b || pair.a) : pair.a);
       btn.setAttribute('disabled', '');
       try {
+        // Approved docs are world-readable, so the name is persisted ONLY when
+        // the box is checked — hiding it at render time isn't enough.
+        const showName = nameRow.querySelector('input').checked;
         await DB.submit({
           pairId: pair.pairId, classId: sideObj.id, partnerId: partner.id,
           scramble: sideObj.scramble, solution: ta.value.trim().replace(/\s+/g, ' '),
-          moves: v.moves, name: DB.user.name || DB.user.email, showName: nameRow.querySelector('input').checked,
+          moves: v.moves, name: showName ? (DB.user.name || DB.user.email) : '', showName,
         });
         toast('Thanks! A moderator will review it soon.');
         render();
@@ -707,7 +721,7 @@ async function pageMod(main) {
     const tbl = h('div', { class: 'modlist' });
     for (const mEntry of mods) tbl.appendChild(h('div', { class: 'modent' },
       h('span', null, mEntry.email || mEntry.uid, mEntry.invite ? ' \u00b7 invited, not yet signed in' : ''),
-      h('button', { class: 'ghost sm', onclick: async () => { await DB.revoke(mEntry.invite ? mEntry.email : mEntry.uid); render(); } }, 'remove')));
+      h('button', { class: 'ghost sm', onclick: async () => { await DB.revoke(mEntry.uid, mEntry.email); render(); } }, 'remove')));
     if (!mods.length) tbl.appendChild(h('p', { class: 'empty' }, 'No additional moderators yet.'));
     const inv = h('div', { class: 'inviterow' },
       h('input', { class: 'searchin', placeholder: 'google account email', 'aria-label': 'moderator email' }),

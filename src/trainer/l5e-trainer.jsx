@@ -456,7 +456,7 @@ function AlgList({ exact }) {
     <div className="alglist">
       {exact.map(([a, nm], i) => (
         <div key={"e" + i} className="algrow">
-          <span className="mono alg">{a}</span>
+          <span className="mono alg">{E.normAlg(a)}</span>
           {nm ? <span className="algname">{nm}</span> : null}
         </div>
       ))}
@@ -1075,12 +1075,17 @@ export default function L5ETrainer() {
   // aggregate per VARIANT = (set, angle), so each orientation gets its own row
   const setAgg = useMemo(() => {
     const agg = {};
-    for (const st of Object.values(caseStats)) {
+    for (const [fk, st] of Object.entries(caseStats)) {
       const vkk = (st.set || "?") + "@" + (st.angle || "DL");
-      const a = agg[vkk] || { set: st.set, angle: st.angle || "DL", n: 0, best: Infinity, sum: 0, cases: 0 };
-      a.n += st.n; a.best = Math.min(a.best, st.best); a.sum += st.sum; a.cases += 1;
+      const a = agg[vkk] || { set: st.set, angle: st.angle || "DL", n: 0, best: Infinity, sum: 0, names: new Set() };
+      // "Cases seen" is shown against counts[] (distinct NAMED cases), so fold
+      // canonical variants that share a name into one before counting
+      const ck = fk.includes("::") ? fk.slice(fk.indexOf("::") + 2) : fk;
+      a.names.add(SHEET.CNAME[ck] || ck);
+      a.n += st.n; a.best = Math.min(a.best, st.best); a.sum += st.sum;
       agg[vkk] = a;
     }
+    for (const k of Object.keys(agg)) { agg[k].cases = agg[k].names.size; delete agg[k].names; }
     return agg;
   }, [caseStats]);
   const angleLabel = (setId, angle) => {

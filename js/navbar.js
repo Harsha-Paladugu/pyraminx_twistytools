@@ -16,6 +16,19 @@
 (function () {
   'use strict';
 
+  // Clickjacking guard: the static host can't send X-Frame-Options /
+  // frame-ancestors headers, so refuse to render inside a foreign frame. (A
+  // sandboxed embed without allow-scripts can't run the app at all, so this
+  // covers what matters: UI-redress of the sign-in / moderation controls.)
+  if (window.top !== window.self) {
+    let foreign = true;
+    try { foreign = window.top.location.origin !== location.origin; } catch (e) { /* cross-origin access throws */ }
+    if (foreign) {
+      document.documentElement.style.display = 'none';
+      try { window.top.location = location.href; } catch (e) {}
+    }
+  }
+
   const SECTIONS = [
     { id: 'home',    label: 'Home',    href: 'index.html' },
     { id: 'oo',      label: 'OO',      href: 'oo.html' },
@@ -62,7 +75,16 @@
           el('span', { class: 'tri', 'aria-hidden': 'true' }), 'PYRAMINX ', el('b', null, '.net')),
         el.apply(null, ['nav', { class: 'navtabs', 'aria-label': 'site' }].concat(tabs)),
         right);
-      const header = el('header', { class: 'topbar' }, main);
+      // Skip link: pages build their main region dynamically (some as <main>,
+      // some as .page, algs as .algwrap), so resolve the target at click time
+      // instead of by id.
+      const skip = el('a', { class: 'skiplink', href: '#' }, 'Skip to content');
+      skip.addEventListener('click', ev => {
+        ev.preventDefault();
+        const m = document.querySelector('main, .page, .algwrap');
+        if (m) { m.setAttribute('tabindex', '-1'); m.focus(); m.scrollIntoView(); }
+      });
+      const header = el('header', { class: 'topbar' }, skip, main);
       if (this.sub.length) {
         const links = this.sub.map(i =>
           el('a', { class: 'sublink' + (i.on ? ' on' : ''), href: i.href,

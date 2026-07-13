@@ -3,6 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- CSP (meta form: no frame-ancestors/report-only here). Allowlist mirrors what the site loads:
+     gstatic = Firebase SDK dynamic imports (js/account.js), googleapis = Auth + Firestore,
+     firebaseapp.com = the auth popup/iframe helper (must match authDomain in js/config.js). -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com; frame-src https://pyraminx-oo.firebaseapp.com https://accounts.google.com; object-src 'none'; base-uri 'self'">
 <title>Pyraminx.net</title>
 <meta name="description" content="Tools for solving the Pyraminx: the best human solutions, a method solver, a trainer, and an algorithm sheet.">
 <link rel="canonical" href="https://pyraminx.net/">
@@ -21,7 +25,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300..800&family=Instrument+Sans:wght@400;500;600&family=Spline+Sans+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="icon" href="img/logo.svg?v=5b08bb0a" type="image/svg+xml">
 <link rel="apple-touch-icon" href="img/apple-touch-icon.png?v=e94eb1b7">
-<link rel="stylesheet" href="css/site.css?v=e9f9c40e">
+<link rel="stylesheet" href="css/site.css?v=b8a9d923">
 <link rel="stylesheet" href="css/home.css?v=0b4c69cb">
 <script>
 /* old links: the OO census used to live at index.html — forward its hash routes */
@@ -31,7 +35,7 @@ if (/^#\/(c\/|browse|mod|about)/.test(location.hash)) location.replace('oo.html'
 <body>
 <script src="js/config.js?v=8f226c72"></script>
 <script src="js/account.js?v=174f1397"></script>
-<script src="js/navbar.js?v=1dde4c5c"></script>
+<script src="js/navbar.js?v=eea7943d"></script>
 <script>new SiteNavbar({ active: 'home' }).mount(document.body);</script>
 <main class="page home">
   <section class="hero">

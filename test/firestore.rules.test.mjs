@@ -17,7 +17,7 @@ import {
   assertSucceeds,
 } from '@firebase/rules-unit-testing';
 import {
-  doc, setDoc, getDoc, updateDoc, addDoc, collection, serverTimestamp,
+  doc, setDoc, getDoc, updateDoc, deleteDoc, addDoc, collection, serverTimestamp,
 } from 'firebase/firestore';
 import fs from 'fs';
 import path from 'path';
@@ -37,6 +37,8 @@ async function test(name, fn) {
 }
 
 const authed = (uid, email = uid + '@example.com') => testEnv.authenticatedContext(uid, { email }).firestore();
+// verified-email context: the moderator-invite rules require email_verified == true
+const authedV = (uid, email = uid + '@example.com') => testEnv.authenticatedContext(uid, { email, email_verified: true }).firestore();
 const anon = () => testEnv.unauthenticatedContext().firestore();
 
 // Seed privileged docs / fixtures bypassing the rules.
@@ -99,6 +101,10 @@ await test('solutions: moves out of range denied', () =>
   assertFails(addDoc(collection(authed('a'), 'solutions'), validSolution('a', { moves: 16 }))));
 await test('solutions: classId out of range denied', () =>
   assertFails(addDoc(collection(authed('a'), 'solutions'), validSolution('a', { classId: 3732480 }))));
+await test('solutions: opted-out name must be empty (privacy)', () =>
+  assertFails(addDoc(collection(authed('a'), 'solutions'), validSolution('a', { showName: false, name: 'Leaky' }))));
+await test('solutions: opted-out with empty name allowed', () =>
+  assertSucceeds(addDoc(collection(authed('a'), 'solutions'), validSolution('a', { showName: false, name: '' }))));
 
 // ---------------- solutions: update ----------------
 async function seedPending(id) {
@@ -114,7 +120,12 @@ await test('solutions: non-mod update denied', async () => {
 await test('solutions: moderator review-field update allowed', async () => {
   await seedPending('s2'); await makeMod('mod1', 'mod1@example.com');
   await assertSucceeds(updateDoc(doc(authed('mod1', 'mod1@example.com'), 'solutions', 's2'),
-    { status: 'approved', reviewedBy: 'mod1@example.com' }));
+    { status: 'approved', reviewedBy: 'mod1' }));
+});
+await test('solutions: forged reviewedBy denied (must be own uid)', async () => {
+  await seedPending('s2b'); await makeMod('mod1b', 'mod1b@example.com');
+  await assertFails(updateDoc(doc(authed('mod1b', 'mod1b@example.com'), 'solutions', 's2b'),
+    { status: 'approved', reviewedBy: 'someone-else' }));
 });
 await test('solutions: moderator content edit denied', async () => {
   await seedPending('s3'); await makeMod('mod2', 'mod2@example.com');
@@ -126,14 +137,63 @@ await test('solutions: admin broad edit allowed', async () => {
   await assertSucceeds(updateDoc(doc(authed('admin1'), 'solutions', 's4'), { solution: 'fixed' }));
 });
 
+// ---------------- moderator invite self-accept ----------------
+await test('moderators: self-accept with verified email + matching invite allowed', async () => {
+  await seed(db => setDoc(doc(db, 'moderatorInvites', 'eve@example.com'), { addedBy: 'admin' }));
+  await assertSucceeds(setDoc(doc(authedV('eve', 'eve@example.com'), 'moderators', 'eve'),
+    { email: 'eve@example.com', via: 'invite' }));
+});
+await test('moderators: self-accept without a matching invite denied', () =>
+  assertFails(setDoc(doc(authedV('mallory', 'mallory@example.com'), 'moderators', 'mallory'),
+    { email: 'mallory@example.com', via: 'invite' })));
+await test('moderators: self-accept with UNVERIFIED email denied', async () => {
+  await seed(db => setDoc(doc(db, 'moderatorInvites', 'unv@example.com'), {}));
+  await assertFails(setDoc(doc(authed('unv', 'unv@example.com'), 'moderators', 'unv'),
+    { email: 'unv@example.com', via: 'invite' }));
+});
+await test('moderators: self-accept with spoofed stored email denied', async () => {
+  await seed(db => setDoc(doc(db, 'moderatorInvites', 'real@example.com'), {}));
+  await assertFails(setDoc(doc(authedV('real', 'real@example.com'), 'moderators', 'real'),
+    { email: 'admin@example.com', via: 'invite' }));
+});
+await test('moderatorInvites: invited user may consume (delete) their OWN invite', async () => {
+  await seed(db => setDoc(doc(db, 'moderatorInvites', 'consume@example.com'), {}));
+  await assertSucceeds(deleteDoc(doc(authedV('c1', 'consume@example.com'), 'moderatorInvites', 'consume@example.com')));
+});
+await test('moderatorInvites: cannot delete someone else\'s invite', async () => {
+  await seed(db => setDoc(doc(db, 'moderatorInvites', 'victim@example.com'), {}));
+  await assertFails(deleteDoc(doc(authedV('attacker', 'attacker@example.com'), 'moderatorInvites', 'victim@example.com')));
+});
+await test('moderatorInvites: admin may re-invite an existing email (update)', async () => {
+  await makeAdmin('adm2');
+  await seed(db => setDoc(doc(db, 'moderatorInvites', 'again@example.com'), { addedBy: 'x' }));
+  await assertSucceeds(setDoc(doc(authed('adm2'), 'moderatorInvites', 'again@example.com'), { addedBy: 'adm2' }));
+});
+
 // ---------------- admins / meta ----------------
 await test('admins: non-admin write denied', () =>
   assertFails(setDoc(doc(authed('u9'), 'admins', 'u9'), {})));
 await test('meta: moderator write allowed, plain user denied', async () => {
   await makeMod('mod3', 'mod3@example.com');
-  await assertSucceeds(setDoc(doc(authed('mod3', 'mod3@example.com'), 'meta', 'stats'), { done: 1, total: 2 }));
-  await assertFails(setDoc(doc(authed('plain'), 'meta', 'stats'), { done: 1, total: 2 }));
+  await assertSucceeds(setDoc(doc(authed('mod3', 'mod3@example.com'), 'meta', 'stats'), { done: 1, total: 78012 }));
+  await assertFails(setDoc(doc(authed('plain'), 'meta', 'stats'), { done: 1, total: 78012 }));
 });
+await test('meta: stats with wrong total / extra keys / bad types denied', async () => {
+  const db = authed('mod3', 'mod3@example.com');
+  await assertFails(setDoc(doc(db, 'meta', 'stats'), { done: 1, total: 2 }));
+  await assertFails(setDoc(doc(db, 'meta', 'stats'), { done: 1, total: 78012, extra: 'x' }));
+  await assertFails(setDoc(doc(db, 'meta', 'stats'), { done: -1, total: 78012 }));
+  await assertFails(setDoc(doc(db, 'meta', 'stats'), { done: 'many', total: 78012 }));
+});
+await test('meta: doneMap shape enforced (b64 string only, size-capped)', async () => {
+  const db = authed('mod3', 'mod3@example.com');
+  await assertSucceeds(setDoc(doc(db, 'meta', 'doneMap'), { b64: 'AAAA' }));
+  await assertFails(setDoc(doc(db, 'meta', 'doneMap'), { b64: 'A'.repeat(13005) }));
+  await assertFails(setDoc(doc(db, 'meta', 'doneMap'), { b64: 'AAAA', junk: 1 }));
+  await assertFails(setDoc(doc(db, 'meta', 'doneMap'), { b64: 42 }));
+});
+await test('meta: arbitrary meta doc write denied even for mods', () =>
+  assertFails(setDoc(doc(authed('mod3', 'mod3@example.com'), 'meta', 'other'), { anything: 'goes' })));
 
 await testEnv.cleanup();
 console.log('\n' + (failed ? '*** ' + failed + ' rules test(s) failed ***' : 'all rules tests passed'));

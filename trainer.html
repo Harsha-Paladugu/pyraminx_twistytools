@@ -3,6 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- CSP (meta form: no frame-ancestors/report-only here). Allowlist mirrors what the site loads:
+     gstatic = Firebase SDK dynamic imports (js/account.js), googleapis = Auth + Firestore,
+     firebaseapp.com = the auth popup/iframe helper (must match authDomain in js/config.js). -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com; frame-src https://pyraminx-oo.firebaseapp.com https://accounts.google.com; object-src 'none'; base-uri 'self'">
 <title>Pyraminx.net · V-First trainer</title>
 <meta name="description" content="Practice your V-First Pyraminx cases with smart scrambles, a timer, recap mode, and your own algorithm sheet.">
 <link rel="canonical" href="https://pyraminx.net/trainer.html">
@@ -21,7 +25,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300..800&family=Instrument+Sans:wght@400;500;600&family=Spline+Sans+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="icon" href="img/logo.svg?v=5b08bb0a" type="image/svg+xml">
 <link rel="apple-touch-icon" href="img/apple-touch-icon.png?v=e94eb1b7">
-<link rel="stylesheet" href="css/site.css?v=e9f9c40e">
+<link rel="stylesheet" href="css/site.css?v=b8a9d923">
 <link rel="stylesheet" href="css/trainer.css?v=63b1dc7a">
 </head>
 <body>
@@ -29,7 +33,7 @@
      the sign-in control). -->
 <script src="js/config.js?v=8f226c72"></script>
 <script src="js/account.js?v=174f1397"></script>
-<script src="js/navbar.js?v=1dde4c5c"></script>
+<script src="js/navbar.js?v=eea7943d"></script>
 <script>new SiteNavbar({ active: 'trainer' }).mount(document.body);</script>
 <div id="root"></div>
 <!-- Static page prose (below the app): what the trainer is and how to use it. -->
@@ -87,7 +91,7 @@
   function boot() {
     if (booted) return; booted = true; bootUid = curUid();
     var s = document.createElement('script');
-    s.src = 'js/trainer.js?v=9e315ed9';
+    s.src = 'js/trainer.js?v=463686fc';
     document.body.appendChild(s);
   }
   if (A && A.whenReady) {

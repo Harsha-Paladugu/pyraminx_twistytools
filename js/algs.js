@@ -636,11 +636,12 @@
     try {
       const res = await fetch('data/pyraminx_algs.json');
       DATA = await res.json();
+      buildModel();   // inside the try: a wrong-shape file must show the error UI, not a blank page
     } catch (e) {
+      console.error('algs: failed to load/parse the algorithm data', e);
       app.appendChild(h('div', { class: 'algerr' }, 'We couldn’t load the algorithms. Try reloading the page.'));
       return;
     }
-    buildModel();
     if (A && A.whenReady) { try { await A.whenReady(); } catch (e) {} }
     await Store.loadAll();
     build();

@@ -63,6 +63,9 @@ service cloud.firestore {
         && request.resource.data.name is string
         && request.resource.data.name.size() < 256
         && request.resource.data.showName is bool
+        // privacy: approved docs are world-readable, so when the submitter opts
+        // out of showing their name, nothing identifying may be persisted at all
+        && (request.resource.data.showName == true || request.resource.data.name == '')
         && request.resource.data.classId is int
         && request.resource.data.classId >= 0 && request.resource.data.classId < 3732480
         && request.resource.data.partnerId is int
@@ -72,30 +75,70 @@ service cloud.firestore {
       // Update: a moderator may only flip the review fields (status -> approved/
       // rejected, plus reviewedBy); an admin may edit more broadly if ever needed.
       // This stops a moderator account from rewriting submitted solution content.
+      // reviewedBy must be the ACTING moderator's uid: binding it stops audit-trail
+      // forgery, and a uid (unlike an email) is safe on a world-readable doc.
       allow update: if isAdmin()
         || (isMod()
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'reviewedBy'])
+        && resource.data.status == 'pending'
             && request.resource.data.status in ['approved', 'rejected']
-            && request.resource.data.reviewedBy is string);
+            && request.resource.data.reviewedBy == request.auth.uid);
       allow delete: if isAdmin();
     }
 
+    // World-readable aggregates driving the public homepage (progress bar +
+    // solved map). Only the moderator approval transaction in js/oo.js writes
+    // them, so pin each doc to that exact shape — a moderator keeps the census
+    // current but can't park arbitrary or oversized blobs in public documents.
+    // Constants below are fixed puzzle math: 78,012 canonical classes, so the
+    // done bitmap is ceil(78012/8) = 9752 bytes = exactly 13,004 base64 chars.
     match /meta/{doc} {
       allow read: if true;
-      allow write: if isMod();
+    }
+    match /meta/doneMap {
+      allow create, update: if isMod()
+        && request.resource.data.keys().hasOnly(['b64'])
+        && request.resource.data.b64 is string
+        && request.resource.data.b64.size() <= 13004;
+    }
+    match /meta/stats {
+      allow create, update: if isMod()
+        && request.resource.data.keys().hasOnly(['done', 'total'])
+        && request.resource.data.done is int
+        && request.resource.data.done >= 0
+        && request.resource.data.done <= 78012
+        && request.resource.data.total == 78012;
     }
 
     match /moderators/{uid} {
       allow read: if isAdmin() || (request.auth != null && request.auth.uid == uid);
+      // Self-accept an invite. Requirements, by what each defends:
+      //  - email_verified: the email claim is the whole basis for the match, so a
+      //    provider issuing unverified-email tokens must not satisfy it.
+      //  - lower(): invite ids are lowercased emails (js/oo.js invite()), so a
+      //    mixed-case Google account still matches instead of being locked out.
+      //  - content pin: the stored doc can't spoof the email the admin list shows.
       allow create: if isAdmin()
         || (request.auth != null && request.auth.uid == uid
-            && exists(/databases/$(database)/documents/moderatorInvites/$(request.auth.token.email)));
+            && request.auth.token.email_verified == true
+            && exists(/databases/$(database)/documents/moderatorInvites/$(request.auth.token.email.lower()))
+            && request.resource.data.keys().hasOnly(['email', 'via'])
+            && request.resource.data.email == request.auth.token.email.lower()
+            && request.resource.data.via is string);
       allow delete: if isAdmin();
     }
 
     match /moderatorInvites/{email} {
-      allow read: if isAdmin() || (request.auth != null && request.auth.token.email == email);
-      allow create, delete: if isAdmin();
+      allow read: if isAdmin()
+        || (request.auth != null && request.auth.token.email_verified == true
+            && request.auth.token.email.lower() == email);
+      allow create, update: if isAdmin();
+      // admins manage invites; the invited (verified) user may delete their OWN
+      // invite to consume it on acceptance, so an invite is single-use and a
+      // later revoke can't be silently re-accepted.
+      allow delete: if isAdmin()
+        || (request.auth != null && request.auth.token.email_verified == true
+            && request.auth.token.email.lower() == email);
     }
 
     // admin allowlist: who isAdmin() trusts. Bootstrap the first entry via the

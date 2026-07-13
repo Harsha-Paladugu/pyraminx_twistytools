@@ -3,7 +3,7 @@
 :root{
   --ink:#0e1420; --ink2:#141c2c; --panel:#19222f; --panel2:#1f2a3a;
   --line:rgba(174,190,214,.14); --line2:rgba(174,190,214,.26);
-  --txt:#e8edf6; --mut:#9fadc4; --dim:#6c7a92; --paper:var(--txt);
+  --txt:#e8edf6; --mut:#9fadc4; --dim:#8794aa; --paper:var(--txt); /* --dim: keep >= 4.5:1 on --panel2 (WCAG AA) */
   --green:#3fbf52; --red:#e8473d; --blue:#3a7fe8; --yellow:#f2cf3c;
   --act:#f2cf3c; --actink:#231c05;
   --disp:'Bricolage Grotesque',system-ui,sans-serif;
@@ -32,6 +32,9 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{
 .ghost.big{font-size:16px;padding:.7em 1.4em}
 .danger{background:transparent;color:var(--red);border:1px solid rgba(232,71,61,.5);padding:.55em 1em}
 .danger:hover{background:rgba(232,71,61,.12)}
+/* skip link: off-screen until keyboard focus lands on it */
+.skiplink{position:absolute;left:-9999px;top:0;z-index:100;background:var(--act);color:var(--actink);font-weight:600;padding:.55em 1.1em;border-radius:0 0 10px 0;text-decoration:none}
+.skiplink:focus{left:0}
 /* top bar */
 .topbar{border-bottom:1px solid var(--line)}
 .topbar-main{display:flex;align-items:center;gap:26px;padding:14px 26px;flex-wrap:wrap}
@@ -44,7 +47,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{
 /* faceted "V" mark — V-First in the four Pyraminx face colors. The navbar mark,
    the favicon, and the hero logo all share one cached file: img/logo.svg. */
 .tri{width:20px;height:20px;display:inline-block;background-repeat:no-repeat;background-position:center;background-size:contain;
-  background-image:url("../img/logo.svg?v=1")}
+  background-image:url("../img/logo.svg?v=5b08bb0a")}
 .navtabs{display:flex;gap:4px;flex:1;flex-wrap:wrap}
 .navlink{text-decoration:none;color:var(--mut);padding:.45em .9em;border-radius:8px;font-weight:500}
 .navlink:hover{color:var(--txt)}
@@ -160,7 +163,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{
 .toast.show{opacity:1;transform:translate(-50%,0)}
 #boot-status{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:var(--ink);z-index:40;transition:opacity .4s ease}
 #boot-status.gone{opacity:0;pointer-events:none;visibility:hidden}
-#boot-status .bigtri{width:78px;height:78px;background-repeat:no-repeat;background-position:center;background-size:contain;background-image:url("../img/logo.svg?v=1");animation:pulse 1.6s ease-in-out infinite}
+#boot-status .bigtri{width:78px;height:78px;background-repeat:no-repeat;background-position:center;background-size:contain;background-image:url("../img/logo.svg?v=5b08bb0a");animation:pulse 1.6s ease-in-out infinite}
 @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.07)}}
 @media(prefers-reduced-motion:reduce){#boot-status .bigtri{animation:none}.bar{transition:none}}
 #boot-label{color:var(--mut);font-size:14.5px}
