@@ -12,8 +12,7 @@
     "check": "node tools/check-sheet.mjs",
     "check:fresh": "node tools/check-fresh.mjs",
     "test": "node tools/check-sheet.mjs",
-    "test:engine": "node tools/test-engine.mjs",
-    "test:rules": "node test/firestore.rules.test.mjs"
+    "test:engine": "node tools/test-engine.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",

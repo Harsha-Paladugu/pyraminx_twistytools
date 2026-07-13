@@ -30,18 +30,18 @@ only gates the admin UI client-side; the rules are what actually enforce writes.
 
 ## 3. Firestore security rules
 
-The rules are version-controlled in [`firestore.rules`](firestore.rules) (wired up
-by [`firebase.json`](firebase.json)) — they are the real authorization boundary
-(`adminEmails` in `config.js` only gates the admin UI). Deploy them with:
+The rules are owned by the hub repo,
+[twistytools.com](https://github.com/Harsha-Paladugu/twistytools.com): one
+shared ruleset for the `twistytools` Firebase project, parameterized on the
+puzzle, with the emulator test suite alongside it. A rules deploy replaces the
+whole project ruleset, so exactly one repo may own it — deploy only from the
+hub repo. This repo has no rules files; do not add them back.
 
-```
-firebase deploy --only firestore:rules
-```
-
-You can also paste the file's contents into the Firebase console (Firestore →
-Rules) if you'd rather not use the CLI. Admin access comes from the `admins/{uid}`
-collection (step 2) — no per-deploy uid edit needed — so deploy only once your
-own `admins/{uid}` doc exists, or admin writes lock out until you create it.
+The OLD `pyraminx-oo` project got its final ruleset (the post-audit rules that
+used to live here) deployed 2026-07-13; if it ever needs a rules change before
+the Phase 6 cutover retires it, recover the file from this repo's git history.
+Admin access comes from the `admins/{uid}` collection (step 2) — no per-deploy
+uid edit needed.
 
 ## 4. One-time PII scrub of legacy solutions (run once, after deploying)
 
