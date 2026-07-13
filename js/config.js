@@ -2,13 +2,16 @@
    This single block is loaded by every page so login + per-user data work
    site-wide. Leave firebase:null to run in demo mode (data stays in this
    browser). The apiKey here is a public client identifier, not a secret —
-   access is controlled by the Firestore security rules. */
+   access is controlled by the Firestore security rules. The firebase block
+   points at the shared TwistyTools project, which serves all three puzzle
+   sites; `puzzle` picks this site's slice of it. */
 window.OO_CONFIG = {
+  puzzle: 'pyraminx',   // namespaces this site's Firestore paths in the shared project
   firebase: {
-    apiKey: "AIzaSyChfW8NzkjT12tfwTE0MTs0C9MEunqALcQ",
-    authDomain: "pyraminx-oo.firebaseapp.com",
-    projectId: "pyraminx-oo",
-    appId: "1:337026212730:web:bff3068050a1b03eb8ecc3"
+    apiKey: "AIzaSyC5b82XjgZ26GsVvgTO0nCK_KiltQhRozM",
+    authDomain: "twistytools-3bf66.firebaseapp.com",
+    projectId: "twistytools-3bf66",
+    appId: "1:446558622358:web:b99303e5695392108e68b7"
   },
 
   adminEmails: ["harsha.paladugu2@gmail.com"],   // your Google account email

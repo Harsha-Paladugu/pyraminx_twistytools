@@ -175,6 +175,13 @@ function liveDB() {
   const subs = new Set(); const notify = () => subs.forEach(f => f());
   const adminEmails = (CFG.adminEmails || []).map(e => e.toLowerCase());
   const A = window.OOAccount;
+  // Census data lives under puzzles/{puzzle}/... in the shared TwistyTools
+  // project, one slice per site. Every census ref goes through pdoc/pcol so
+  // nothing here can touch another puzzle's data. admins/{uid} alone stays
+  // top-level: one admin allowlist covers all three sites.
+  const PUZ = CFG.puzzle || 'pyraminx';
+  const pdoc = (...s) => F.doc(fs, 'puzzles', PUZ, ...s);
+  const pcol = (n) => F.collection(fs, 'puzzles', PUZ, n);
   // Recompute moderator/admin status whenever the shared session changes.
   async function recomputeRole() {
     const user = A.user;
@@ -186,17 +193,17 @@ function liveDB() {
     isAdmin = !!user && (adminDoc || adminEmails.includes((user.email || '').toLowerCase()));
     isMod = isAdmin;
     if (user && !isMod) {
-      try { const m = await F.getDoc(F.doc(fs, 'moderators', user.uid)); isMod = m.exists(); } catch {}
+      try { const m = await F.getDoc(pdoc('moderators', user.uid)); isMod = m.exists(); } catch {}
       if (!isMod) { // accept an invite if one exists for this email
         try {
           const email = (user.email || '').toLowerCase();   // invites are keyed by lowercased email
-          const inv = await F.getDoc(F.doc(fs, 'moderatorInvites', email));
+          const inv = await F.getDoc(pdoc('moderatorInvites', email));
           if (inv.exists()) {
-            await F.setDoc(F.doc(fs, 'moderators', user.uid), { email, via: 'invite' });
+            await F.setDoc(pdoc('moderators', user.uid), { email, via: 'invite' });
             // consume the invite so it's single-use: otherwise a later admin
             // revoke (which deletes moderators/{uid}) would be silently undone by
             // this same code re-accepting the still-present invite on next load.
-            try { await F.deleteDoc(F.doc(fs, 'moderatorInvites', email)); } catch {}
+            try { await F.deleteDoc(pdoc('moderatorInvites', email)); } catch {}
             isMod = true;
           }
         } catch {}
@@ -216,35 +223,35 @@ function liveDB() {
     signIn() { return A.signIn(); },
     signOut() { return A.signOut(); },
     async stats() {
-      try { const d = await F.getDoc(F.doc(fs, 'meta', 'stats'));
+      try { const d = await F.getDoc(pdoc('meta', 'stats'));
         return d.exists() ? d.data() : { done: 0, total: T.reps.length };
       } catch { return { done: 0, total: T.reps.length }; }
     },
     async doneMap() {
       try {
-        const d = await F.getDoc(F.doc(fs, 'meta', 'doneMap'));
+        const d = await F.getDoc(pdoc('meta', 'doneMap'));
         return decodeBitmap(d.exists() ? d.data().b64 : '');
       } catch { return decodeBitmap(''); }
     },
     async pairSolutions(pairId) {
       const out = [];
-      const q1 = F.query(F.collection(fs, 'solutions'),
+      const q1 = F.query(pcol('solutions'),
         F.where('pairId', '==', pairId), F.where('status', '==', 'approved'));
       (await F.getDocs(q1)).forEach(d => out.push({ id: d.id, ...d.data() }));
       if (A.user) {
-        const q2 = F.query(F.collection(fs, 'solutions'),
+        const q2 = F.query(pcol('solutions'),
           F.where('pairId', '==', pairId), F.where('uid', '==', A.user.uid), F.where('status', '==', 'pending'));
         (await F.getDocs(q2)).forEach(d => out.push({ id: d.id, ...d.data() }));
       }
       return out;
     },
     async submit(doc) {
-      await F.addDoc(F.collection(fs, 'solutions'), {
+      await F.addDoc(pcol('solutions'), {
         ...doc, uid: A.user.uid, status: 'pending', createdAt: F.serverTimestamp() });
       notify();
     },
     async pending() {
-      const q = F.query(F.collection(fs, 'solutions'), F.where('status', '==', 'pending'));
+      const q = F.query(pcol('solutions'), F.where('status', '==', 'pending'));
       const out = []; (await F.getDocs(q)).forEach(d => out.push({ id: d.id, ...d.data() }));
       return out;
     },
@@ -252,7 +259,7 @@ function liveDB() {
       if (action === 'rejected') {
         // reviewedBy is the uid, not the email: approved docs are world-readable,
         // and the rules bind this field to request.auth.uid.
-        await F.updateDoc(F.doc(fs, 'solutions', id), { status: 'rejected', reviewedBy: A.user.uid });
+        await F.updateDoc(pdoc('solutions', id), { status: 'rejected', reviewedBy: A.user.uid });
         notify(); return;
       }
       // Enforce the per-scramble cap before approving. Rules can't count sibling
@@ -263,18 +270,18 @@ function liveDB() {
       // one extra approved solution (visible in the UI, deletable by an admin);
       // the bitmap/counter stay consistent because both transactions serialize
       // on the meta docs. Throw CAP so pageMod can explain the block.
-      const preSnap = await F.getDoc(F.doc(fs, 'solutions', id));
+      const preSnap = await F.getDoc(pdoc('solutions', id));
       if (!preSnap.exists() || preSnap.data().status !== 'pending') { notify(); return; }
-      const approvedQ = F.query(F.collection(fs, 'solutions'),
+      const approvedQ = F.query(pcol('solutions'),
         F.where('pairId', '==', preSnap.data().pairId), F.where('status', '==', 'approved'));
       if ((await F.getDocs(approvedQ)).size >= MAX_SOLUTIONS) throw new Error('CAP');
       // approval: transaction updates the solution, the done bitmap and the counter
       await F.runTransaction(fs, async tx => {
-        const solRef = F.doc(fs, 'solutions', id);
+        const solRef = pdoc('solutions', id);
         const sol = await tx.get(solRef);
         if (!sol.exists() || sol.data().status !== 'pending') return;
         const data = sol.data();
-        const mapRef = F.doc(fs, 'meta', 'doneMap'), statRef = F.doc(fs, 'meta', 'stats');
+        const mapRef = pdoc('meta', 'doneMap'), statRef = pdoc('meta', 'stats');
         const mapDoc = await tx.get(mapRef), statDoc = await tx.get(statRef);
         const bm = decodeBitmap(mapDoc.exists() ? mapDoc.data().b64 : '');
         let added = 0;
@@ -298,18 +305,18 @@ function liveDB() {
     },
     async mods() {
       const out = [];
-      try { (await F.getDocs(F.collection(fs, 'moderators'))).forEach(d => out.push({ uid: d.id, ...d.data() }));
-        (await F.getDocs(F.collection(fs, 'moderatorInvites'))).forEach(d => out.push({ email: d.id, invite: true, ...d.data() })); } catch {}
+      try { (await F.getDocs(pcol('moderators'))).forEach(d => out.push({ uid: d.id, ...d.data() }));
+        (await F.getDocs(pcol('moderatorInvites'))).forEach(d => out.push({ email: d.id, invite: true, ...d.data() })); } catch {}
       return out;
     },
-    async invite(email) { await F.setDoc(F.doc(fs, 'moderatorInvites', email.toLowerCase()), { addedBy: A.user.email }); notify(); },
+    async invite(email) { await F.setDoc(pdoc('moderatorInvites', email.toLowerCase()), { addedBy: A.user.email }); notify(); },
     // Revoking a moderator must remove BOTH the moderators/{uid} doc and any
     // lingering email-keyed invite, or the revoked user's client re-accepts the
     // invite on next load. Called with (uid, email); either may be null (an
     // uninvited-but-accepted mod has no invite; an invite row has no uid yet).
     async revoke(uid, email) {
-      if (uid) { try { await F.deleteDoc(F.doc(fs, 'moderators', uid)); } catch {} }
-      if (email) { try { await F.deleteDoc(F.doc(fs, 'moderatorInvites', String(email).toLowerCase())); } catch {} }
+      if (uid) { try { await F.deleteDoc(pdoc('moderators', uid)); } catch {} }
+      if (email) { try { await F.deleteDoc(pdoc('moderatorInvites', String(email).toLowerCase())); } catch {} }
       notify();
     },
   };
