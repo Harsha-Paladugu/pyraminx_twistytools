@@ -151,6 +151,58 @@ test('realCanonKey: invariant under AUF (U-keying move + twist shift)', () => {
   assert.strictEqual(E.realCanonKey(s3, 1), k);       // (U·e, t+1) is in the same orbit
 });
 
+// ---- twist-aware keying (rotateFrame carries c; realCanonKeyT) ----
+test('rotateFrame: center twists ride the frame (matches applySym exactly)', () => {
+  // the sym whose EDGE action equals one rotateFrame step must move c the same
+  // way rotateFrame now does — checked on every rotation sym against many states
+  const rnd = (i) => {
+    const s = E.solved();
+    for (let k = 0; k < 10; k++) E.applyMoveIdx(s, (i * 7 + k * 3) % 8);
+    return s;
+  };
+  const states = Array.from({ length: 24 }, (_, i) => rnd(i + 1));
+  let matched = 0;
+  for (const sym of syms.rots) {
+    if (states.every(s => E.applySym(sym, s).e.join() === (() => { const r = { e: s.e.slice(), c: s.c.slice() }; E.rotateFrame(r, 1); return r.e.join(); })())) {
+      matched++;
+      for (const s of states) {
+        const r = { e: s.e.slice(), c: s.c.slice() };
+        E.rotateFrame(r, 1);
+        assert.strictEqual(r.c.join(), E.applySym(sym, s).c.join(), 'c must rotate exactly as the matching symmetry does');
+      }
+    }
+  }
+  assert.strictEqual(matched, 1, 'exactly one rotation sym should match rotateFrame');
+});
+test('rotateFrame: three steps restore edges AND twists; edge-only states untouched', () => {
+  const s = { e: scrambledEdges().e, c: [1, 2, 0] };
+  const r = { e: s.e.slice(), c: s.c.slice() };
+  E.rotateFrame(r, 3);
+  assert.strictEqual(r.e.join() + '/' + r.c.join(), s.e.join() + '/' + s.c.join());
+  const noC = { e: s.e.slice() };
+  E.rotateFrame(noC, 1);                              // realCanonKey's scratch shape
+  assert.strictEqual(noC.c, undefined, 'no .c must not be invented');
+});
+test('realCanonKeyT: invariant under frame rotation and AUF; sign never flips', () => {
+  const s = { e: scrambledEdges().e, c: [0, 0, 2] };  // a TL4E-B "+" style state
+  const k = E.realCanonKeyT(s, 1);
+  const r = { e: s.e.slice(), c: s.c.slice() };
+  E.rotateFrame(r, 1);                                // twist moves to another axis
+  assert.strictEqual(E.realCanonKeyT(r, 1), k);
+  const a = { e: s.e.slice(), c: s.c.slice() };
+  E.applyMoveK(a, 'U', false);                        // AUF never touches c
+  assert.strictEqual(E.realCanonKeyT(a, 2), k);
+  const flipped = { e: s.e.slice(), c: [0, 0, 1] };   // the "−" twin is a different case
+  assert.notStrictEqual(E.realCanonKeyT(flipped, 1), k);
+  assert(k.split('|')[2].includes('2') && !k.split('|')[2].includes('1'), 'canonical carries the twist value unchanged');
+});
+test('keyToState: parses the twist-aware third key part; 2-part keys unchanged', () => {
+  const st = E.keyToState('30,10,20,00,40,50|2|010');
+  assert.strictEqual(st.c.join(','), '0,1,0');
+  assert.strictEqual(st.u, 2);
+  assert.strictEqual(E.keyToState('30,10,20,00,40,50|2').c.join(','), '0,0,0');
+});
+
 // ---- the optimal BFS solver ----
 const dist = buildDist(E);   // shared tools/lib builder; built once for both tests
 test('optimalSolution: solves a scramble in exactly its optimal length', () => {

@@ -13,9 +13,18 @@
  *
  * Drilled coverage is gated by SHEET.CNAME (trainer buildPools). To avoid any
  * drilling regression: every canonical key the old sheet had is preserved, and
- * subsets the trainer does not yet drill (TL4E-B/-R, Pseudo-V, L4E Building
- * Blocks, the full 184-case L4E) are compiled into a separate SHEET.DEFERRED
- * namespace that buildPools never reads (wired for drilling in a follow-up).
+ * subsets the trainer does not drill (Pseudo-V, L4E Building Blocks, the full
+ * 184-case L4E) are compiled into a separate SHEET.DEFERRED namespace that
+ * buildPools never reads.
+ *
+ * TL4E (twisted-center) cases get their own namespace, SHEET.TL4E, with
+ * twist-aware keys: render key = "ek|u|LRB" (the defining center twist is part
+ * of the case), canonical = realCanonKeyT. The twist SIGN is derived from the
+ * geometry of each alg (caseStateOf), never from the authored +/- label, which
+ * the algs page cannot validate and which is wrong on a few entries; label
+ * disagreements are reported as advisories. Non-defining center twists an alg
+ * happens to leave are tip-fixable and zeroed out of the key (the same
+ * convention the algs page uses for its diagrams).
  *
  * Run: npm run build:sheet   (node tools/compile-sheet.mjs [--check])
  */
@@ -46,10 +55,10 @@ const BROKEN = require(path.join(ROOT, 'data', 'broken-algs.json'));
 const BROKEN_KEYS = new Set(BROKEN.map(b => b.renderKey + ' :: ' + b.algorithm));
 
 // keying + alg→case helpers are the engine's single source of truth.
-const { stateKey, realCanonKey, caseStateOf, algSolvesKey, applyMoveK } = E;
+const { stateKey, realCanonKey, realCanonKeyT, caseStateOf, algSolvesKey, applyMoveK, openOfEkey } = E;
 
 // ---- naming ----
-const DEFERRED = new Set(['TL4E-B', 'TL4E-R', 'Pseudo-V', 'L4E Building Blocks', 'L4E']);
+const DEFERRED = new Set(['Pseudo-V', 'L4E Building Blocks', 'L4E']);
 function subsetLabel(subsetKey, alg) {
   // ML4E (the right/left open-slot angles) is the same family as L4E viewed from
   // another slot. Label its algs as plain "L4E" so the trainer presents them as
@@ -71,8 +80,36 @@ const normName = (name) => String(name).replace(/^ML4E(?:-[RL])? · /, 'L4E · '
 
 // ---- pass 1: group every alg by the canonical key it actually solves ----
 const byKey = {}; // canon -> { items:[{alg, renderKey, label, deferred}] }
-const report = { algs: 0, skipped: [], centerCollisions: 0, mislabels: 0, misfiled: [], renames: [], carried: 0, primaryNew: 0, deferredKeys: 0, keptBroken: 0 };
+const byKeyT = {}; // TL4E: tcanon -> { items:[{alg, renderKey, label}] }
+const report = { algs: 0, skipped: [], centerCollisions: 0, mislabels: 0, misfiled: [], renames: [], carried: 0, primaryNew: 0, deferredKeys: 0, keptBroken: 0, tl4eSignFixed: [], tl4eDropped: [] };
+// TL4E defining axis (index into c=[L,R,B]) by the alg's own presentation frame
+// (openOfEkey side). B-type = the center opposite the open slot, R-type = the
+// adjacent right center; both rotate with the frame (DF->DL->DR is one [u]
+// step, under which the twist moves R->L, B->R, L->B). LL cases (side '') have
+// no open slot and read in the authored DF frame.
+const TL4E_AXIS = { 'TL4E-B': { DF: 2, '': 2, DL: 1, DR: 0 }, 'TL4E-R': { DF: 1, '': 1, DL: 0, DR: 2 } };
+const SIGN_DISP = { '+': '+', '-': '−' };
+function collectT(subsetKey, caseName, alg) {
+  report.algs++;
+  const cs = caseStateOf(alg.alg);
+  if (!cs) { report.skipped.push(subsetKey + ' / ' + caseName + ': ' + alg.alg); return; }
+  const axis = TL4E_AXIS[subsetKey][openOfEkey(stateKey(cs))];
+  const val = cs.c[axis];
+  if (!val) { // the defining center isn't twisted: not a TL4E alg for this subset
+    report.tl4eDropped.push(subsetKey + ' / ' + caseName + ' (' + alg.twist + '): ' + alg.alg + '   [c=' + cs.c.join('') + ']');
+    return;
+  }
+  const sign = val === 2 ? '+' : '-';
+  if (alg.twist && alg.twist !== sign)
+    report.tl4eSignFixed.push(subsetKey + ' / ' + caseName + ': labeled ' + alg.twist + ', solves ' + sign + '   [' + alg.alg + ']');
+  const cleanC = [0, 0, 0]; cleanC[axis] = val;
+  const renderKey = stateKey(cs) + '|' + cs.u + '|' + cleanC.join('');
+  const tcanon = realCanonKeyT({ e: cs.e, c: cleanC }, cs.u);
+  const label = subsetKey + ' · ' + caseName + ' ' + SIGN_DISP[sign];
+  (byKeyT[tcanon] = byKeyT[tcanon] || { items: [] }).items.push({ alg: alg.alg, renderKey, label });
+}
 function collect(subsetKey, caseName, alg) {
+  if (TL4E_AXIS[subsetKey]) return collectT(subsetKey, caseName, alg);
   report.algs++;
   const cs = caseStateOf(alg.alg);
   if (!cs) { report.skipped.push(subsetKey + ' / ' + caseName + ': ' + alg.alg); return; }
@@ -188,10 +225,32 @@ for (const rk of Object.keys(OLD.ALG)) {
 report.deferredKeys = Object.keys(DEF.CNAME).length;
 MAIN.DEFERRED = DEF;
 
+// ---- TL4E namespace: same shapes as MAIN but twist-aware keys; PRES rows are
+// [ek, uTwist, cstr, name] (the extra cstr drives the diagram's center twist
+// and the ALG lookup). No carry-forward: every TL4E alg lives in the JSON.
+const TL4E = { ALG: {}, NAME: {}, CNAME: {}, PRES: {} };
+for (const [canon, rec] of Object.entries(byKeyT)) {
+  const votes = {};
+  for (const it of rec.items) votes[it.label] = (votes[it.label] || 0) + 1;
+  const name = Object.entries(votes).sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))[0][0];
+  for (const it of rec.items) {
+    const arr = (TL4E.ALG[it.renderKey] = TL4E.ALG[it.renderKey] || []);
+    if (!arr.some(r => r[0] === it.alg)) arr.push([it.alg, name]);
+    TL4E.NAME[it.renderKey] = name;
+  }
+  TL4E.CNAME[canon] = name;
+  const pres = (TL4E.PRES[canon] = TL4E.PRES[canon] || []);
+  for (const it of rec.items) {
+    const [sk, tw, cstr] = it.renderKey.split('|');
+    if (!pres.some(p => p[0] === sk && p[1] === +tw)) pres.push([sk, +tw, cstr, name]);
+  }
+}
+MAIN.TL4E = TL4E;
+
 // ---- normalize displayed alg notation (engine.normAlg: expand S/H, R R -> R2)
 // so the bundled sheet/trainer show the same clean notation as the algorithms
 // page (which applies the same shared function to the JSON). Dedupe per key.
-for (const SH of [MAIN, DEF]) {
+for (const SH of [MAIN, DEF, TL4E]) {
   for (const rk of Object.keys(SH.ALG)) {
     const seen = new Set(), out = [];
     for (const [alg, name] of SH.ALG[rk]) { const n = E.normAlg(alg); if (!seen.has(n)) { seen.add(n); out.push([n, name]); } }
@@ -204,8 +263,9 @@ for (const SH of [MAIN, DEF]) {
 // (kept to avoid empty panels). A failing alg that ISN'T allowlisted fails the
 // build; an allowlisted entry that no longer fails is just a stale-manifest note.
 const failingBroken = [];
-for (const [rk, algs] of Object.entries(MAIN.ALG))
-  for (const [alg] of algs) if (!algSolvesKey(alg, rk)) failingBroken.push(rk + ' :: ' + alg);
+for (const SH of [MAIN, TL4E])
+  for (const [rk, algs] of Object.entries(SH.ALG))
+    for (const [alg] of algs) if (!algSolvesKey(alg, rk)) failingBroken.push(rk + ' :: ' + alg);
 const unexpectedBroken = failingBroken.filter(k => !BROKEN_KEYS.has(k));
 const staleBroken = [...BROKEN_KEYS].filter(k => !failingBroken.includes(k));
 const selfCheckOk = unexpectedBroken.length === 0;
@@ -269,6 +329,19 @@ if (unexpectedSkips.length) {
 console.log('MAIN  keys  ALG:', Object.keys(MAIN.ALG).length, 'NAME:', Object.keys(MAIN.NAME).length,
   'CNAME:', Object.keys(MAIN.CNAME).length, 'PRES:', Object.keys(MAIN.PRES).length, '| distinct names:', distinctMain);
 console.log('DEFERRED keys ALG:', Object.keys(DEF.ALG).length, 'CNAME:', Object.keys(DEF.CNAME).length);
+console.log('TL4E  keys  ALG:', Object.keys(TL4E.ALG).length, 'CNAME:', Object.keys(TL4E.CNAME).length,
+  '| distinct names:', new Set(Object.values(TL4E.CNAME)).size);
+// TL4E advisories: authored twist labels the geometry contradicts (the alg ships
+// under the sign it actually solves), and algs whose defining center isn't
+// twisted at all (not TL4E cases; left out of the TL4E namespace).
+if (report.tl4eSignFixed.length) {
+  console.log('\nADVISORY: ' + report.tl4eSignFixed.length + ' TL4E alg(s) filed under their geometric sign, not their authored label:');
+  report.tl4eSignFixed.forEach(s => console.log('   SIGN ' + s));
+}
+if (report.tl4eDropped.length) {
+  console.log('\nADVISORY: ' + report.tl4eDropped.length + ' TL4E alg(s) whose defining center is not twisted (excluded from SHEET.TL4E):');
+  report.tl4eDropped.forEach(s => console.log('   NOTWIST ' + s));
+}
 console.log('carried forward (old keys w/o JSON primary):', report.carried);
 console.log('primary-new cases (added to drilled surface):', report.primaryNew);
 console.log('center-twist collisions (deferred algs routed to DEFERRED):', report.centerCollisions);

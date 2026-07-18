@@ -364,6 +364,10 @@ function rotateFrame(s, times) {
       s.e[dst * 2] = ROT_TO[p];
       s.e[dst * 2 + 1] = e[src * 2 + 1] ^ ROT_D[src] ^ ROT_D[p];
     }
+    // the axial twists ride along: under one [u] step corner R lands on L,
+    // B on R, L on B (validated against applySym in tools/test-engine.mjs).
+    // States without .c (realCanonKey's edge-only scratch) are left alone.
+    if (s.c) s.c = [s.c[1], s.c[2], s.c[0]];
   }
   return s;
 }
@@ -382,7 +386,26 @@ function realCanonKey(st, t) {
   }
   return best;
 }
-function keyToState(k) { const [ek, tw] = k.split('|'); return { e: ek.split(',').flatMap(t => [+t[0], +t[1]]), c: [0, 0, 0], u: +tw }; }
+// Twist-aware keying for TL4E: the render key grows a third part carrying the
+// center twists ("ek|u|LRB"), and the canonical is the same lex-min over
+// 3 frame rotations x 3 AUF as realCanonKey with the twists rotating along
+// (rotateFrame moves .c when present; U turns never touch it).
+function realCanonKeyT(st, t) {
+  const base = { e: st.e.slice(), c: st.c.slice() };
+  let best = null;
+  for (let r = 0; r < 3; r++) {
+    const cs = base.c.join('');
+    const cur = { e: base.e.slice() };
+    for (let a = 0; a < 3; a++) {
+      const s = stateKey(cur) + '|' + ((t + a) % 3) + '|' + cs;
+      if (best === null || s < best) best = s;
+      applyMoveK(cur, 'U', false);
+    }
+    rotateFrame(base, 1);
+  }
+  return best;
+}
+function keyToState(k) { const [ek, tw, cs] = k.split('|'); return { e: ek.split(',').flatMap(t => [+t[0], +t[1]]), c: cs ? [+cs[0], +cs[1], +cs[2]] : [0, 0, 0], u: +tw }; }
 // expand the sheet's macro notation into tokens parseAlg accepts (S/H/Y; the
 // `2'` suffix is handled by parseAlg directly but normalized here too).
 function preprocessAlg(a) {
@@ -458,7 +481,7 @@ module.exports = {
   parseAlg, countMoves, applyParsed, makeFrames, mirrorAlg, mirrorToken,
   optimalSolution, optimalScramble, invertAlg, faceCompose, FACE_ID,
   // keying + alg→case (single source of truth; see section above)
-  stateKey, applyMoveK, rotateFrame, realCanonKey, keyToState,
+  stateKey, applyMoveK, rotateFrame, realCanonKey, realCanonKeyT, keyToState,
   openOfEkey, barOfEkey, permsOf, permParity, enumFreeSlots,
   preprocessAlg, inverseState, caseStateOf, algSolvesKey, normAlg, prependAUF,
 };

@@ -40,11 +40,11 @@
 <section class="page">
   <div class="card prose">
     <h3>How to practice here</h3>
-    <p>The trainer is how you actually learn the <a href="algs.html">algorithm sheet</a>. Pick the cases you want to work on, and every scramble it deals will land in one of them. That way you&rsquo;re always practicing something you chose, not whatever happens to come up. Drill mode feeds you cases with a timer. Recap mode goes through every case you&rsquo;ve enabled exactly once, which is a good way to find out what has stuck. There are also modes for case recognition and for reading full solutions. If a case keeps beating you, look it up on the <a href="algs.html">Algorithms</a> sheet, or paste a scramble into the <a href="solver.html">Solver</a> and compare approaches. Progress saves in this browser on its own, and if you sign in at the top right it follows you to other devices.</p>
+    <p>The trainer is how you actually learn the <a href="algs.html">algorithm sheet</a>. It covers all three systems on the sheet: L4E, TL4E, and L5E. Pick the cases you want to work on, and every scramble it deals will land in one of them. That way you&rsquo;re always practicing something you chose, not whatever happens to come up. Drill mode feeds you cases with a timer. Recap mode goes through every case you&rsquo;ve enabled exactly once, which is a good way to find out what has stuck. There are also modes for case recognition and for reading full solutions. If a case keeps beating you, look it up on the <a href="algs.html">Algorithms</a> sheet, or paste a scramble into the <a href="solver.html">Solver</a> and compare approaches. Progress saves in this browser on its own, and if you sign in at the top right it follows you to other devices.</p>
   </div>
 </section>
 <!-- Shared puzzle renderer (same code the rest of the site uses for diagrams). -->
-<script src="js/engine.js?v=6944c3e9"></script>
+<script src="js/engine.js?v=979cc144"></script>
 <script src="js/render.js?v=096c0da8"></script>
 <script>
 /* Trainer storage bridge.
@@ -91,7 +91,7 @@
   function boot() {
     if (booted) return; booted = true; bootUid = curUid();
     var s = document.createElement('script');
-    s.src = 'js/trainer.js?v=463686fc';
+    s.src = 'js/trainer.js?v=74a2fa03';
     document.body.appendChild(s);
   }
   if (A && A.whenReady) {
